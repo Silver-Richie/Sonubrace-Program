@@ -30,17 +30,19 @@ password hashing both need `https://` or `localhost`). Create an account, fill i
 questionnaire, then open the Monitor and press **Run a 6-second recording** — the simulator works
 with no hardware attached.
 
-### Publishing to GitHub Pages
+### Publishing for real users
+
+**See [DEPLOY.md](DEPLOY.md) for the full walkthrough.** In short:
 
 1. Push this repository to GitHub.
-2. **Settings → Pages → Source: Deploy from a branch**, branch `main`, folder `/ (root)`.
-3. Replace the canonical URL placeholder everywhere:
+2. **Settings → Pages → Source: GitHub Actions.**
+3. Done — [`.github/workflows/pages.yml`](.github/workflows/pages.yml) deploys on every push and
+   rewrites the canonical-URL placeholder to your real address automatically, so you never edit a
+   URL by hand.
 
-```bash
-grep -rl "YOUR-USERNAME" . | xargs sed -i 's|YOUR-USERNAME|your-github-username|g'
-```
-
-`.nojekyll` is already present so GitHub Pages serves the files verbatim.
+That gives you a public site anyone can open. Add a Supabase project (Part 2 of DEPLOY.md) and the
+same code switches from per-browser accounts to a shared database, so a user can sign in from any
+device.
 
 ---
 

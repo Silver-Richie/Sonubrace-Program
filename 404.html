@@ -5,31 +5,107 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Page not found — Sonubrace</title>
 <meta name="robots" content="noindex, follow">
-<meta name="theme-color" content="#06657f">
+<meta name="theme-color" content="#06657f" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f2231" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2306657f'/%3E%3Cpath d='M6 20c3-8 5 6 8-2s5 6 8-4' stroke='%23fff' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="assets/css/sonubrace.css">
-<script>try{var t=localStorage.getItem('sonubrace.theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
-</head>
-<body>
-<a class="skip-link" href="#main">Skip to main content</a>
-<header class="site-header" data-sonubrace-header></header>
 
-<main id="main">
-  <div class="wrap-narrow center stack">
-    <h1>That page does not exist</h1>
-    <p>The link may be out of date, or the address may have a typo in it.</p>
-    <div class="row" style="justify-content:center">
-      <a class="btn btn-lg" href="index.html">Go to the home page</a>
-      <a class="btn btn-lg btn-secondary" href="app.html">Open the monitor</a>
-    </div>
+<!--
+  This page is deliberately SELF-CONTAINED: no external CSS, no external JS.
+
+  GitHub Pages serves 404.html for any missing path, including deep ones like
+  /sonubrace/a/b/c. Relative asset paths would resolve against that
+  non-existent directory and the page would arrive unstyled — looking broken
+  rather than handled. A <base> tag can repair that, but the browser's preload
+  scanner starts fetching stylesheets before an inline script can insert one,
+  so the failed requests happen anyway.
+
+  Inlining everything sidesteps the problem completely: this page renders
+  correctly at any depth, on a project site, a user site or a custom domain,
+  with no heuristics and no build step. The links below are still resolved at
+  runtime, but a wrong link is a far smaller failure than a page with no styles.
+-->
+<style>
+  :root {
+    --ink: #10202f; --ink-2: #3d5364; --bg: #f4fafd; --surface: #ffffff;
+    --line: #cfe0ea; --brand: #06657f; --brand-deep: #044156;
+    --brand-soft: #d6f0f8; --pattern-soft: #efe4fb;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #edf6fb; --ink-2: #b6cbd9; --bg: #08151f; --surface: #0f2231;
+      --line: #2b4256; --brand: #5fd0ee; --brand-deep: #a6e7fa;
+      --brand-soft: #10394b; --pattern-soft: #2f1f4b;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    display: grid; place-items: center;
+    padding: 2rem 1.25rem;
+    font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+    font-size: 1.05rem; line-height: 1.65;
+    color: var(--ink); background: var(--bg);
+    background-image:
+      radial-gradient(48rem 26rem at 15% -10%, var(--brand-soft) 0%, transparent 62%),
+      radial-gradient(40rem 22rem at 88% 6%, var(--pattern-soft) 0%, transparent 64%);
+  }
+  main { width: min(620px, 100%); text-align: center; }
+  .mark {
+    width: 56px; height: 56px; margin: 0 auto 1.5rem; border-radius: 16px;
+    background: linear-gradient(135deg, #06657f 0%, #6a35a8 55%, #9c3d00 100%);
+    display: grid; place-items: center; color: #fff; font-size: 1.6rem; font-weight: 800;
+  }
+  h1 { font-size: clamp(1.7rem, 1.2rem + 2vw, 2.5rem); line-height: 1.2;
+       letter-spacing: -.02em; margin: 0 0 .6rem; }
+  p { color: var(--ink-2); margin: 0 auto 1.75rem; max-width: 46ch; }
+  .row { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: center; }
+  a.btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 48px; padding: .75rem 1.4rem;
+    font-weight: 700; text-decoration: none; border-radius: 999px;
+    border: 2px solid transparent; background: var(--brand); color: #fff;
+    transition: background 180ms, transform 180ms;
+  }
+  a.btn:hover { background: var(--brand-deep); transform: translateY(-1px); }
+  a.btn.secondary { background: var(--surface); color: var(--brand-deep); border-color: var(--line); }
+  a.btn.secondary:hover { background: var(--brand-soft); }
+  @media (prefers-color-scheme: dark) {
+    a.btn { color: #062430; }
+    a.btn.secondary { color: var(--brand); }
+  }
+  a:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--bg), 0 0 0 6px var(--brand); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+
+<body>
+<main>
+  <div class="mark" aria-hidden="true">◟</div>
+  <h1>That page does not exist</h1>
+  <p>The link may be out of date, or the address may have a typo in it. Everything on Sonubrace is
+     reachable from the home page.</p>
+  <div class="row">
+    <a class="btn" href="/" id="home">Go to the home page</a>
+    <a class="btn secondary" href="/" id="monitor">Open the monitor</a>
   </div>
 </main>
 
-<footer class="site-footer" data-sonubrace-footer></footer>
-
-<script src="assets/js/config.js"></script>
-<script src="assets/js/db.js"></script>
-<script src="assets/js/ui.js"></script>
-<script>SonubraceUI.boot();</script>
+<script>
+/* Point the two links at the real site root. A project site keeps the
+   repository name as its first path segment; a user site and a custom domain
+   do not. Getting this wrong costs a click, not a broken page — which is
+   exactly why the styling above does not depend on it. */
+(function () {
+  var parts = location.pathname.split('/').filter(Boolean);
+  var onGithub = /\.github\.io$/.test(location.hostname);
+  var root = (parts.length > 1 || (onGithub && parts.length === 1))
+    ? '/' + parts[0] + '/'
+    : '/';
+  document.getElementById('home').href = root + 'index.html';
+  document.getElementById('monitor').href = root + 'app.html';
+})();
+</script>
 </body>
 </html>

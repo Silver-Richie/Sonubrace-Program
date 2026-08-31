@@ -1,0 +1,108 @@
+# ============================================================================
+# Deploy Sonubrace to GitHub Pages.
+#
+# Runs on every push to main. There is no build step — the site is plain HTML,
+# CSS and JS — but this workflow does one job that matters: it rewrites the
+# canonical URL placeholder to the real published address.
+#
+# That is why the repository can stay generic. You never edit a URL by hand,
+# and the canonical/og:url/sitemap entries can never drift out of step with
+# where the site actually lives, which is the usual way a static site ends up
+# telling search engines the wrong address.
+# ============================================================================
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # lets you redeploy from the Actions tab
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two deploys at once; let a newer push finish rather than cancelling
+# it, so the live site always ends up matching the latest commit.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Point canonical URLs at the real site
+        env:
+          # configure-pages resolves this correctly for project sites
+          # (user.github.io/repo/), user and organisation sites
+          # (user.github.io/), and custom domains alike.
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          set -euo pipefail
+
+          BASE="${SITE_URL%/}/"
+          PLACEHOLDER="https://YOUR-USERNAME.github.io/sonubrace/"
+          echo "Rewriting $PLACEHOLDER -> $BASE"
+
+          # Every canonical, og:url, JSON-LD @id, sitemap <loc> and the robots
+          # Sitemap: line are all built from this one prefix, so a single
+          # substitution keeps them consistent by construction.
+          grep -rl "$PLACEHOLDER" \
+            --include='*.html' --include='*.xml' --include='*.txt' . \
+            | xargs -r sed -i "s|$PLACEHOLDER|$BASE|g"
+
+          # Fail loudly rather than publishing a site that tells crawlers it
+          # lives at a placeholder address.
+          if grep -rq "YOUR-USERNAME" --include='*.html' --include='*.xml' --include='*.txt' .; then
+            echo "::error::A YOUR-USERNAME placeholder survived the rewrite."
+            grep -rn "YOUR-USERNAME" --include='*.html' --include='*.xml' --include='*.txt' .
+            exit 1
+          fi
+
+          # Stamp the sitemap with today's date so lastmod is honest.
+          sed -i "s|<lastmod>[^<]*</lastmod>|<lastmod>$(date -u +%Y-%m-%d)</lastmod>|g" sitemap.xml
+
+          echo "Canonical URLs now point at $BASE"
+
+      - name: Sanity-check the build
+        run: |
+          set -euo pipefail
+          # Catch the mistakes that silently produce a broken public site.
+          test -f .nojekyll        || { echo "::error::.nojekyll is missing - Pages would ignore files starting with an underscore."; exit 1; }
+          test -f index.html       || { echo "::error::index.html is missing."; exit 1; }
+          test -f 404.html         || { echo "::error::404.html is missing."; exit 1; }
+          test -f assets/js/config.js || { echo "::error::assets/js/config.js is missing."; exit 1; }
+
+          # Warn, do not fail, when no backend is configured: the site still
+          # works in browser-local mode and that is a legitimate way to deploy.
+          if grep -q "url: ''" assets/js/config.js; then
+            echo "::warning::No Supabase URL is set in assets/js/config.js. Accounts will be stored per-browser, so a user cannot sign in from a second device."
+          fi
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Report the live URL
+        run: |
+          echo "### Sonubrace is live" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.deployment.outputs.page_url }}" >> $GITHUB_STEP_SUMMARY
