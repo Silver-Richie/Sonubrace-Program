@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor — Sonubrace</title>
+<meta name="description" content="The Sonubrace live monitor: connect the band over Bluetooth or run the simulator, and watch the Doppler spectrogram, velocity, flow direction and flow pattern update in real time.">
+<link rel="canonical" href="https://YOUR-USERNAME.github.io/sonubrace/app.html">
+<meta name="robots" content="noindex, follow">
+<meta name="theme-color" content="#06657f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2306657f'/%3E%3Cpath d='M6 20c3-8 5 6 8-2s5 6 8-4' stroke='%23fff' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/sonubrace.css">
+<script>try{var t=localStorage.getItem('sonubrace.theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+</head>
+
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="site-header" data-sonubrace-header></header>
+
+<main id="main">
+  <div class="wrap stack">
+
+    <div class="row row-between">
+      <div>
+        <h1 class="mb-0">Monitor</h1>
+        <p class="muted mb-0" id="greeting">Loading…</p>
+      </div>
+      <span class="badge" id="mode-badge">—</span>
+    </div>
+
+    <!-- ============================================ source controls ===== -->
+    <section class="card" aria-labelledby="source-title">
+      <div class="panel-head">
+        <h2 id="source-title">Signal source</h2>
+        <span class="badge" id="link-status"><span class="dot" aria-hidden="true"></span> Not connected</span>
+      </div>
+
+      <div class="grid grid-2">
+        <!-- BLE -->
+        <div>
+          <h3>Sonubrace band</h3>
+          <p class="small">Streams baseband I/Q and IMU orientation over Bluetooth Low Energy.</p>
+          <div class="row">
+            <button type="button" class="btn" id="ble-connect">Connect over Bluetooth</button>
+            <button type="button" class="btn btn-secondary" id="ble-disconnect" hidden>Disconnect</button>
+          </div>
+          <p class="small muted" id="ble-note" style="margin-top:.6rem"></p>
+        </div>
+
+        <!-- Simulation -->
+        <div>
+          <h3>Simulator</h3>
+          <p class="small">Generates a physically-modelled Doppler signal so every screen works
+          without hardware. The declared peak velocity is genuine ground truth: the pipeline has to
+          recover it from the waveform like any other recording.</p>
+
+          <div class="field">
+            <label for="scenario">Scenario</label>
+            <select id="scenario"></select>
+          </div>
+
+          <div class="field">
+            <label for="sim-psv">Peak systolic velocity: <span id="sim-psv-out" class="mono">0.75</span> m/s</label>
+            <input type="range" id="sim-psv" min="0.15" max="2.0" step="0.05" value="0.75">
+          </div>
+
+          <div class="field">
+            <label for="sim-hr">Heart rate: <span id="sim-hr-out" class="mono">72</span> bpm</label>
+            <input type="range" id="sim-hr" min="40" max="140" step="1" value="72">
+          </div>
+
+          <div class="field">
+            <label for="sim-turb">Turbulence: <span id="sim-turb-out" class="mono">0.05</span></label>
+            <input type="range" id="sim-turb" min="0" max="0.9" step="0.05" value="0.05">
+          </div>
+
+          <label class="check" style="margin-bottom:.8rem">
+            <input type="checkbox" id="sim-reverse">
+            <span>Reverse the flow direction</span>
+          </label>
+
+          <div class="row">
+            <button type="button" class="btn" id="sim-run">Run a 6-second recording</button>
+            <button type="button" class="btn btn-secondary" id="sim-live">Start live mode</button>
+          </div>
+          <p class="small muted" id="sim-note" style="margin-top:.6rem"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================================================== IMU ========= -->
+    <section class="card" aria-labelledby="imu-title">
+      <div class="panel-head">
+        <h2 id="imu-title">Position and angle guidance</h2>
+        <span class="badge badge-info" id="imu-source">simulated</span>
+      </div>
+
+      <div class="grid grid-2">
+        <div>
+          <div class="viz">
+            <canvas id="imu-canvas"></canvas>
+          </div>
+          <p class="viz-caption">
+            Side view of your forearm. The wedge is the acceptable angle band; the beam turns green
+            when you are inside it and holding still.
+          </p>
+        </div>
+
+        <div>
+          <div class="alert" id="imu-guidance" role="status" aria-live="polite">
+            <div>
+              <h3 id="imu-guidance-title">Angle guidance</h3>
+              <p class="mb-0" id="imu-guidance-text">Waiting for orientation data…</p>
+            </div>
+          </div>
+
+          <div class="grid grid-2">
+            <div class="metric metric-imu">
+              <p class="metric-label">Insonation angle</p>
+              <p class="metric-value"><span id="imu-angle">—</span><span class="metric-unit">°</span></p>
+              <p class="metric-note">Target <span id="imu-target">60</span>°</p>
+            </div>
+            <div class="metric metric-imu">
+              <p class="metric-label">Velocity distortion</p>
+              <p class="metric-value"><span id="imu-error">—</span><span class="metric-unit">%</span></p>
+              <p class="metric-note">Caused by being off the target angle</p>
+            </div>
+          </div>
+
+          <div class="field" style="margin-top:1rem">
+            <label for="manual-angle">Set the angle by hand: <span id="manual-angle-out" class="mono">60</span>°</label>
+            <span class="hint">Use this on a desktop, or to see how angle changes the reading.</span>
+            <input type="range" id="manual-angle" min="10" max="89" step="1" value="60">
+          </div>
+
+          <div class="row">
+            <button type="button" class="btn btn-secondary btn-sm" id="imu-device">Use this device's sensors</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="imu-drift">Simulate movement</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ spectrogram ========= -->
+    <section class="card" aria-labelledby="spec-title">
+      <div class="panel-head">
+        <h2 id="spec-title">Doppler spectrogram</h2>
+        <span class="badge" id="quality-badge">—</span>
+      </div>
+
+      <div class="viz">
+        <canvas id="spectrogram"></canvas>
+      </div>
+      <div class="legend">
+        <span><i class="ramp" style="width:90px"></i> weak → strong signal</span>
+        <span><i style="background:var(--velocity)"></i> velocity envelope</span>
+        <span><i style="background:var(--pattern)"></i> cardiac cycle onset</span>
+        <span>above the dashed line = forward flow, below = reverse</span>
+      </div>
+      <p class="viz-caption" id="spec-caption">Run a recording to see the spectrogram.</p>
+
+      <h3 class="mt-2">Velocity envelope</h3>
+      <div class="viz">
+        <canvas id="envelope"></canvas>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--support)"></i> peak systolic velocity (PSV)</span>
+        <span><i style="background:var(--imu)"></i> end-diastolic velocity (EDV)</span>
+      </div>
+    </section>
+
+    <!-- ============================================== parameters ======== -->
+    <section aria-labelledby="params-title">
+      <h2 id="params-title">The three main parameters</h2>
+
+      <div class="grid grid-3">
+        <article class="metric metric-velocity">
+          <p class="metric-label">1 · Velocity</p>
+          <p class="metric-value"><span id="p-psv">—</span><span class="metric-unit">m/s</span></p>
+          <p class="metric-note">Peak systolic. EDV <span id="p-edv" class="mono">—</span> ·
+             mean <span id="p-vmean" class="mono">—</span> m/s</p>
+          <div class="meter"><span id="p-psv-meter" style="width:0; background:var(--velocity)"></span></div>
+        </article>
+
+        <article class="metric metric-direction">
+          <p class="metric-label">2 · Flow direction</p>
+          <p class="metric-value" style="font-size:1.4rem" id="p-direction">—</p>
+          <p class="metric-note">Forward <span id="p-forward" class="mono">—</span> ·
+             reverse <span id="p-reverse" class="mono">—</span> of signal power</p>
+          <div class="meter"><span id="p-dir-meter" style="width:0; background:var(--direction)"></span></div>
+        </article>
+
+        <article class="metric metric-pattern">
+          <p class="metric-label">3 · Flow pattern</p>
+          <p class="metric-value" style="font-size:1.4rem" id="p-pattern">—</p>
+          <p class="metric-note">Periodicity <span id="p-periodicity" class="mono">—</span> ·
+             bandwidth <span id="p-bandwidth" class="mono">—</span> Hz ·
+             broadening <span id="p-broadening" class="mono">—</span></p>
+          <div class="meter"><span id="p-pattern-meter" style="width:0; background:var(--pattern)"></span></div>
+        </article>
+      </div>
+
+      <h3 class="mt-2">Supporting indices</h3>
+      <p class="small muted">Derived from the three parameters above — these are the figures a
+      clinician will recognise.</p>
+
+      <div class="grid grid-4">
+        <article class="metric metric-support">
+          <p class="metric-label">RI</p>
+          <p class="metric-value" id="p-ri">—</p>
+          <p class="metric-note">(PSV − EDV) / PSV</p>
+        </article>
+        <article class="metric metric-support">
+          <p class="metric-label">PI</p>
+          <p class="metric-value" id="p-pi">—</p>
+          <p class="metric-note">(PSV − EDV) / mean</p>
+        </article>
+        <article class="metric metric-support">
+          <p class="metric-label">S/D ratio</p>
+          <p class="metric-value" id="p-sd">—</p>
+          <p class="metric-note">PSV / EDV</p>
+        </article>
+        <article class="metric metric-support">
+          <p class="metric-label">Heart rate</p>
+          <p class="metric-value"><span id="p-hr">—</span><span class="metric-unit">bpm</span></p>
+          <p class="metric-note"><span id="p-cycles">0</span> cycles · HRV
+             <span id="p-hrv" class="mono">—</span> ms</p>
+        </article>
+      </div>
+
+      <details class="disclose mt-2">
+        <summary>Acquisition detail — what the receiver actually did</summary>
+        <div class="table-scroll">
+          <table>
+            <caption>Signal-chain parameters for this recording</caption>
+            <tbody id="acq-table"></tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+
+    <!-- ================================================ save ============ -->
+    <section class="card card-accent" aria-labelledby="save-title">
+      <h2 id="save-title">Save this recording</h2>
+      <p>Give it a name you will recognise later. You can rename it any time from the Recordings page.</p>
+
+      <form id="save-form" class="row" style="align-items:flex-end">
+        <div class="field" style="flex:1 1 280px; margin-bottom:0">
+          <label for="rec-name">Recording name</label>
+          <input type="text" id="rec-name" maxlength="80" autocomplete="off">
+        </div>
+        <button type="submit" class="btn" id="save-btn" disabled>Save recording</button>
+        <a class="btn btn-secondary" href="analysis.html" id="analyse-link" aria-disabled="true">Analyse this recording</a>
+      </form>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer" data-sonubrace-footer></footer>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/db.js"></script>
+<script src="assets/js/dsp.js"></script>
+<script src="assets/js/simulate.js"></script>
+<script src="assets/js/spectrogram.js"></script>
+<script src="assets/js/imu.js"></script>
+<script src="assets/js/ble.js"></script>
+<script src="assets/js/ai.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  'use strict';
+  var UI = SonubraceUI, DB = SonubraceDB, DSP = SonubraceDSP,
+      SIM = SonubraceSim, VIZ = SonubraceViz, BLE = SonubraceBLE;
+
+  var cfg = DSP.defaultConfig();
+  var currentResult = null;
+  var profile = null;
+  var liveTimer = null;
+  var stream = null;
+
+  /* --------------------------------------------------------- boot ------- */
+
+  UI.boot({ requireAuth: true }).then(function (user) {
+    if (!user) return;
+    document.getElementById('greeting').textContent =
+      'Signed in as ' + (user.fullName || user.email) + '.';
+    document.getElementById('mode-badge').textContent =
+      DB.mode() === 'remote' ? 'Hosted database' : 'This browser only';
+    return DB.getProfile();
+  }).then(function (p) {
+    profile = p;
+    /* The profile's angle is the acquisition angle — it belongs in the DSP
+       config, not just in the questionnaire. */
+    if (p && p.angle_deg) {
+      cfg.thetaDeg = p.angle_deg;
+      document.getElementById('manual-angle').value = p.angle_deg;
+      document.getElementById('manual-angle-out').textContent = p.angle_deg;
+      imu.cfg.target = p.angle_deg;
+      document.getElementById('imu-target').textContent = p.angle_deg;
+    }
+    if (!p) {
+      UI.toast('Fill in your health profile to get a fuller analysis.', 'warn', 8000);
+    }
+  }).catch(function (e) { console.error(e); });
+
+  /* ---------------------------------------------------- simulator ------- */
+
+  var scenarioSel = document.getElementById('scenario');
+  Object.keys(SIM.SCENARIOS).forEach(function (k) {
+    var o = document.createElement('option');
+    o.value = k;
+    o.textContent = SIM.SCENARIOS[k].label;
+    scenarioSel.appendChild(o);
+  });
+
+  function syncScenario() {
+    var sc = SIM.SCENARIOS[scenarioSel.value];
+    document.getElementById('sim-psv').value = sc.psv;
+    document.getElementById('sim-hr').value = sc.hr;
+    document.getElementById('sim-turb').value = sc.turbulence;
+    syncSliders();
+    document.getElementById('sim-note').textContent = sc.note;
+  }
+  function syncSliders() {
+    document.getElementById('sim-psv-out').textContent = document.getElementById('sim-psv').value;
+    document.getElementById('sim-hr-out').textContent = document.getElementById('sim-hr').value;
+    document.getElementById('sim-turb-out').textContent = document.getElementById('sim-turb').value;
+  }
+  scenarioSel.addEventListener('change', syncScenario);
+  ['sim-psv', 'sim-hr', 'sim-turb'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', syncSliders);
+  });
+  syncScenario();
+
+  function simOptions(durationS) {
+    return {
+      scenario: scenarioSel.value,
+      psv: Number(document.getElementById('sim-psv').value),
+      hr: Number(document.getElementById('sim-hr').value),
+      turbulence: Number(document.getElementById('sim-turb').value),
+      reverseFlow: document.getElementById('sim-reverse').checked,
+      durationS: durationS,
+      seed: Date.now() & 0x7fffffff
+    };
+  }
+
+  document.getElementById('sim-run').addEventListener('click', function () {
+    stopLive();
+    var btn = this;
+    btn.disabled = true; btn.textContent = 'Computing…';
+    /* Yield a frame so the button state paints before the FFT work starts. */
+    setTimeout(function () {
+      try {
+        var res = SIM.simulate(cfg, simOptions(6));
+        if (!res) throw new Error('Not enough samples to build a spectrogram.');
+        render(res);
+        UI.toast('Recording complete.', 'ok');
+      } catch (err) {
+        UI.toast(err.message, 'risk', 8000);
+      }
+      btn.disabled = false; btn.textContent = 'Run a 6-second recording';
+    }, 30);
+  });
+
+  document.getElementById('sim-live').addEventListener('click', function () {
+    if (liveTimer) { stopLive(); return; }
+    this.textContent = 'Stop live mode';
+    this.classList.add('btn-danger');
+    /* Live mode re-simulates a rolling window; with a real band the same
+       render() is fed from the BLE stream instead. */
+    liveTimer = setInterval(function () {
+      var res = SIM.simulate(cfg, simOptions(4));
+      if (res) render(res, { quiet: true });
+    }, 1200);
+  });
+
+  function stopLive() {
+    if (liveTimer) clearInterval(liveTimer);
+    liveTimer = null;
+    var btn = document.getElementById('sim-live');
+    btn.textContent = 'Start live mode';
+    btn.classList.remove('btn-danger');
+  }
+
+  /* -------------------------------------------------------- BLE --------- */
+
+  var link = new BLE.BleLink();
+  var bleNote = document.getElementById('ble-note');
+
+  if (!BLE.isSupported()) {
+    document.getElementById('ble-connect').disabled = true;
+    bleNote.textContent = BLE.unsupportedReason() + ' The simulator below works in every browser.';
+  } else {
+    bleNote.textContent = 'Your browser supports Web Bluetooth. Turn the band on and pair it.';
+  }
+
+  link.on('connection', function (s) {
+    var badge = document.getElementById('link-status');
+    badge.innerHTML = '<span class="dot" aria-hidden="true"></span> ' +
+      (s.connected ? 'Connected' + (s.name ? ' to ' + UI.esc(s.name) : '') : 'Not connected');
+    badge.className = 'badge ' + (s.connected ? 'badge-ok' : '');
+    document.getElementById('ble-disconnect').hidden = !s.connected;
+    document.getElementById('ble-connect').hidden = s.connected;
+    if (s.connected) {
+      stopLive();
+      stream = new SIM.StreamBuffer(cfg, 6);
+      link.startStream().catch(function () {});
+    }
+  });
+
+  link.on('error', function (msg) { UI.toast(msg, 'warn', 8000); });
+
+  /* Baseband arrives in small blocks; the rolling buffer re-runs the pipeline
+     roughly twice a second rather than on every packet. */
+  var lastProcess = 0;
+  link.on('iq', function (block) {
+    if (!stream) return;
+    stream.push(block.I, block.Q);
+    var now = performance.now();
+    if (now - lastProcess < 500) return;
+    lastProcess = now;
+    var res = stream.process();
+    if (res) { res.source = 'device'; render(res, { quiet: true }); }
+  });
+
+  link.on('imu', function (d) { imu.setOrientation(d.angle, d.roll, d.gyro, 'band'); });
+
+  link.on('status', function (s) {
+    if (!s.contact) UI.toast('The band reports poor skin contact.', 'warn', 6000);
+  });
+
+  document.getElementById('ble-connect').addEventListener('click', function () {
+    link.connect().catch(function () { /* already surfaced via the error handler */ });
+  });
+  document.getElementById('ble-disconnect').addEventListener('click', function () {
+    link.disconnect();
+  });
+
+  /* -------------------------------------------------------- IMU --------- */
+
+  var imu = new SonubraceIMU.IMU(document.getElementById('imu-canvas'), { height: 250 });
+  imu.start();
+
+  imu.onUpdate(function (st) {
+    document.getElementById('imu-angle').textContent = st.angle.toFixed(0);
+    document.getElementById('imu-error').textContent = Math.round(st.cosineErrorPercent);
+    document.getElementById('imu-source').textContent = st.source;
+
+    var box = document.getElementById('imu-guidance');
+    box.className = 'alert ' + (st.guidance.level === 'ok' ? 'alert-ok' : 'alert-warn');
+    document.getElementById('imu-guidance-title').textContent =
+      st.ready ? 'Ready to record' : st.guidance.level === 'ok' ? 'Almost there' : 'Adjust the band';
+    document.getElementById('imu-guidance-text').textContent = st.guidance.text;
+  });
+
+  var manual = document.getElementById('manual-angle');
+  manual.addEventListener('input', function () {
+    document.getElementById('manual-angle-out').textContent = manual.value;
+    imu.stopSimulatedDrift();
+    /* The manual angle is the acquisition angle too: changing it changes every
+       velocity the pipeline will report from here on. */
+    cfg.thetaDeg = Number(manual.value);
+    imu.setOrientation(Number(manual.value), 0, 0, 'manual');
+  });
+
+  document.getElementById('imu-device').addEventListener('click', function () {
+    var btn = this;
+    imu.useDeviceSensors().then(function (ok) {
+      UI.toast(ok ? 'Using this device\'s motion sensors.'
+                  : 'This device did not grant motion access, so the manual slider stays in charge.',
+               ok ? 'ok' : 'warn', 7000);
+      if (ok) { imu.stopSimulatedDrift(); btn.disabled = true; }
+    });
+  });
+
+  document.getElementById('imu-drift').addEventListener('click', function () {
+    imu.useSimulatedDrift(Number(manual.value));
+    UI.toast('Simulating the small movements of a worn band.', 'ok');
+  });
+
+  imu.setOrientation(60, 0, 0, 'manual');
+
+  /* ------------------------------------------------------ rendering ----- */
+
+  function render(result, opts) {
+    opts = opts || {};
+    currentResult = result;
+    var p = result.params;
+
+    VIZ.drawSpectrogram(document.getElementById('spectrogram'), result, { height: 320 });
+    VIZ.drawEnvelope(document.getElementById('envelope'), result, { height: 220 });
+    document.getElementById('spec-caption').textContent = VIZ.describeSpectrogram(result);
+
+    /* --- main parameters --- */
+    document.getElementById('p-psv').textContent = UI.fmt(p.psv, 2);
+    document.getElementById('p-edv').textContent = UI.fmt(p.edv, 2);
+    document.getElementById('p-vmean').textContent = UI.fmt(p.vMean, 2);
+    document.getElementById('p-psv-meter').style.width =
+      Math.min(100, (p.psv / 2.0) * 100) + '%';
+
+    document.getElementById('p-direction').textContent =
+      p.direction > 0 ? 'Forward' : p.direction < 0 ? 'Reverse' : 'Bidirectional';
+    document.getElementById('p-forward').textContent = Math.round(p.forwardFraction * 100) + '%';
+    document.getElementById('p-reverse').textContent = Math.round(p.reverseFraction * 100) + '%';
+    document.getElementById('p-dir-meter').style.width =
+      Math.round(Math.max(p.forwardFraction, p.reverseFraction) * 100) + '%';
+
+    document.getElementById('p-pattern').textContent = p.patternName;
+    document.getElementById('p-periodicity').textContent = UI.fmt(p.periodicity, 2);
+    document.getElementById('p-bandwidth').textContent = Math.round(p.bandwidthHz);
+    document.getElementById('p-broadening').textContent = UI.fmt(p.spectralBroadening, 2);
+    document.getElementById('p-pattern-meter').style.width =
+      Math.round(p.periodicity * 100) + '%';
+
+    /* --- supporting --- */
+    document.getElementById('p-ri').textContent = UI.fmt(p.ri, 2);
+    document.getElementById('p-pi').textContent = UI.fmt(p.pi, 2);
+    document.getElementById('p-sd').textContent = p.sdRatio ? UI.fmt(p.sdRatio, 2) : '—';
+    document.getElementById('p-hr').textContent = p.heartRateBpm ? Math.round(p.heartRateBpm) : '—';
+    document.getElementById('p-cycles').textContent = result.cycles.nCycles;
+    document.getElementById('p-hrv').textContent = Math.round(p.hrVariabilityMs);
+
+    /* --- quality --- */
+    var qb = document.getElementById('quality-badge');
+    var q = p.signalQuality;
+    qb.textContent = 'Signal quality ' + Math.round(q * 100) + '%';
+    qb.className = 'badge ' + (q >= 0.7 ? 'badge-ok' : q >= 0.55 ? 'badge-warn' : 'badge-risk');
+
+    /* --- acquisition table --- */
+    var truthRows = result.truth ? [
+      ['Simulated scenario', result.truth.label],
+      ['Ground-truth PSV', UI.fmt(result.truth.psv, 2) + ' m/s'],
+      ['PSV recovery error',
+        Math.round(Math.abs(p.psv - result.truth.psv) / result.truth.psv * 100) + '%']
+    ] : [];
+
+    document.getElementById('acq-table').innerHTML = [
+      ['Source', result.source === 'device' ? 'Sonubrace band over BLE' : 'Simulator'],
+      ['Transmit frequency f₀', (cfg.f0 / 1e6).toFixed(1) + ' MHz'],
+      ['Insonation angle θ', cfg.thetaDeg.toFixed(0) + '°'],
+      ['Speed of sound c', cfg.c + ' m/s'],
+      ['Slow-time sample rate', (cfg.fs / 1000).toFixed(1) + ' kHz'],
+      ['Truncated long code', cfg.nSegments + ' segments × ' + cfg.codeLen + ' chips'],
+      ['STFT window', cfg.fftSize + ' samples, hop ' + cfg.hop + ', ' + cfg.window],
+      ['Frequency resolution', (cfg.fs / cfg.fftSize).toFixed(1) + ' Hz per bin'],
+      ['Time resolution', (result.envelope.dt * 1000).toFixed(1) + ' ms per frame'],
+      ['Wall filter', cfg.wallFilterHz + ' Hz high-pass'],
+      ['Spectrogram frames', result.spectrogram.frames],
+      ['Signal-to-noise', Math.round(p.snrDb) + ' dB']
+    ].concat(truthRows).map(function (r) {
+      return '<tr><th scope="row">' + r[0] + '</th><td class="num mono">' + UI.esc(r[1]) + '</td></tr>';
+    }).join('');
+
+    /* --- enable saving --- */
+    var nameField = document.getElementById('rec-name');
+    if (!nameField.value) nameField.value = DB.defaultRecordingName();
+    document.getElementById('save-btn').disabled = false;
+
+    /* Stash for the analysis page. */
+    try {
+      sessionStorage.setItem('sonubrace.lastResult', JSON.stringify(compact(result)));
+      var link = document.getElementById('analyse-link');
+      link.removeAttribute('aria-disabled');
+      link.href = 'analysis.html?from=session';
+    } catch (e) { /* quota — the analysis page will fall back to a saved recording */ }
+
+    if (!opts.quiet && p.signalQuality < 0.55) {
+      UI.toast('Signal quality is low — check the angle and hold still, then record again.', 'warn', 9000);
+    }
+  }
+
+  /* The spectrogram matrix is far too large to store; the envelope plus the
+     parameters carry everything the analysis and the AI actually use. */
+  function compact(result) {
+    var e = result.envelope, step = Math.max(1, Math.floor(e.nFrames / 400));
+    var v = [], t = [], bw = [];
+    for (var i = 0; i < e.nFrames; i += step) {
+      v.push(Number(e.vPeak[i].toFixed(4)));
+      t.push(Number(e.time[i].toFixed(3)));
+      bw.push(Math.round(e.bw[i]));
+    }
+    return {
+      params: result.params,
+      durationS: result.durationS,
+      cycles: { nCycles: result.cycles.nCycles, heartRateBpm: result.cycles.heartRateBpm,
+                hrVariabilityMs: result.cycles.hrVariabilityMs },
+      envelope: { vPeak: v, time: t, bw: bw, dt: e.dt * step, nFrames: v.length },
+      config: { f0: cfg.f0, fs: cfg.fs, c: cfg.c, thetaDeg: cfg.thetaDeg,
+                fftSize: cfg.fftSize, hop: cfg.hop },
+      source: result.source || 'simulation',
+      truth: result.truth || null
+    };
+  }
+
+  /* --------------------------------------------------------- save ------- */
+
+  document.getElementById('save-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!currentResult) return;
+
+    var name = document.getElementById('rec-name').value.trim() || DB.defaultRecordingName();
+    var btn = document.getElementById('save-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+
+    var c = compact(currentResult);
+    DB.saveRecording({
+      name: name,
+      source: currentResult.source || 'simulation',
+      scenario: currentResult.truth ? currentResult.truth.scenario : null,
+      duration_s: Number(currentResult.durationS.toFixed(2)),
+      site: (profile && profile.site) || 'radial',
+      angle_deg: cfg.thetaDeg,
+      signal_quality: Number(currentResult.params.signalQuality.toFixed(3)),
+      params: c.params,
+      envelope: c.envelope
+    })
+      .then(function (row) {
+        UI.toast('Saved as “' + name + '”.', 'ok');
+        var l = document.getElementById('analyse-link');
+        l.href = 'analysis.html?id=' + encodeURIComponent(row.id);
+        l.removeAttribute('aria-disabled');
+        btn.textContent = 'Save again';
+        btn.disabled = false;
+      })
+      .catch(function (err) {
+        UI.toast(err.message, 'risk', 9000);
+        btn.textContent = 'Save recording';
+        btn.disabled = false;
+      });
+  });
+
+  /* Canvases are sized from their container, so a resize needs a redraw. */
+  var resizeTimer;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      if (currentResult) {
+        VIZ.drawSpectrogram(document.getElementById('spectrogram'), currentResult, { height: 320 });
+        VIZ.drawEnvelope(document.getElementById('envelope'), currentResult, { height: 220 });
+      }
+    }, 200);
+  });
+
+  window.addEventListener('beforeunload', function () { stopLive(); imu.stop(); });
+})();
+</script>
+</body>
+</html>

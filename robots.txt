@@ -1,0 +1,13 @@
+# Sonubrace
+User-agent: *
+Allow: /
+
+# Signed-in areas carry personal health data and are noindex'd in-page too.
+Disallow: /app.html
+Disallow: /profile.html
+Disallow: /analysis.html
+Disallow: /calibration.html
+Disallow: /login.html
+Disallow: /register.html
+
+Sitemap: https://YOUR-USERNAME.github.io/sonubrace/sitemap.xml

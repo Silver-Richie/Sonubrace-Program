@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your health profile — Sonubrace</title>
+<meta name="description" content="The health questionnaire that Sonubrace combines with your Doppler parameters to interpret each recording against your own circumstances.">
+<link rel="canonical" href="https://YOUR-USERNAME.github.io/sonubrace/profile.html">
+<meta name="robots" content="noindex, follow">
+<meta name="theme-color" content="#06657f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2306657f'/%3E%3Cpath d='M6 20c3-8 5 6 8-2s5 6 8-4' stroke='%23fff' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/sonubrace.css">
+<script>try{var t=localStorage.getItem('sonubrace.theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+</head>
+
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="site-header" data-sonubrace-header></header>
+
+<main id="main">
+  <div class="wrap-narrow stack">
+
+    <h1>Your health profile</h1>
+    <p>
+      These answers are the non-signal half of the analysis. Doppler numbers alone cannot tell a
+      raised velocity in a 25-year-old athlete from a raised velocity in a 70-year-old smoker — your
+      profile is what lets the analyst tell the difference.
+    </p>
+
+    <div class="alert">
+      <div>
+        <h3>Everything here is optional except age</h3>
+        <p class="mb-0">Leave anything blank and the analysis simply weighs fewer factors. You can
+        change any answer later, and you can export or delete all of it from the Recordings page.</p>
+      </div>
+    </div>
+
+    <form id="profile-form" novalidate>
+      <div data-error-summary hidden></div>
+
+      <!-- ============================================= basics =========== -->
+      <fieldset>
+        <legend>About you</legend>
+
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="age">Age <span aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+            <span class="hint" id="age-hint">In years. Age changes what counts as a normal velocity and resistive index.</span>
+            <input type="number" id="age" name="age" min="1" max="120" inputmode="numeric"
+                   required aria-describedby="age-hint">
+          </div>
+
+          <div class="field">
+            <label for="sex">Sex</label>
+            <span class="hint" id="sex-hint">Recorded because reference velocity ranges differ slightly.</span>
+            <select id="sex" name="sex" aria-describedby="sex-hint">
+              <option value="">Prefer not to say</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="intersex">Intersex</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="height_cm">Height</label>
+            <span class="hint" id="height-hint">In centimetres.</span>
+            <input type="number" id="height_cm" name="height_cm" min="60" max="250" step="0.5"
+                   inputmode="decimal" aria-describedby="height-hint">
+          </div>
+
+          <div class="field">
+            <label for="weight_kg">Weight</label>
+            <span class="hint" id="weight-hint">In kilograms. Used with height to compute BMI.</span>
+            <input type="number" id="weight_kg" name="weight_kg" min="20" max="300" step="0.1"
+                   inputmode="decimal" aria-describedby="weight-hint">
+          </div>
+        </div>
+
+        <p class="small" id="bmi-readout" aria-live="polite"></p>
+      </fieldset>
+
+      <!-- ======================================== vital signs =========== -->
+      <fieldset>
+        <legend>Recent vital signs</legend>
+        <p class="small muted">If you have measured these recently, they sharpen the interpretation
+        considerably. Blood pressure and velocity are two views of the same circulation.</p>
+
+        <div class="grid grid-3">
+          <div class="field">
+            <label for="systolic">Systolic blood pressure</label>
+            <span class="hint" id="sys-hint">The upper number, in mmHg.</span>
+            <input type="number" id="systolic" name="systolic_mmhg" min="60" max="260"
+                   inputmode="numeric" aria-describedby="sys-hint">
+          </div>
+          <div class="field">
+            <label for="diastolic">Diastolic blood pressure</label>
+            <span class="hint" id="dia-hint">The lower number, in mmHg.</span>
+            <input type="number" id="diastolic" name="diastolic_mmhg" min="30" max="160"
+                   inputmode="numeric" aria-describedby="dia-hint">
+          </div>
+          <div class="field">
+            <label for="glucose">Fasting glucose</label>
+            <span class="hint" id="glu-hint">In mg/dL, if you know it.</span>
+            <input type="number" id="glucose" name="fasting_glucose" min="40" max="500"
+                   inputmode="numeric" aria-describedby="glu-hint">
+          </div>
+        </div>
+      </fieldset>
+
+      <!-- ========================================== conditions ========== -->
+      <fieldset>
+        <legend>Diagnosed conditions</legend>
+        <p class="small muted">Tick any a clinician has diagnosed. These carry the most weight in the
+        risk model, because a known condition changes what a given waveform means.</p>
+
+        <div class="check-grid">
+          <label class="check"><input type="checkbox" name="conditions" value="hypertension"><span>High blood pressure (hypertension)</span></label>
+          <label class="check"><input type="checkbox" name="conditions" value="diabetes"><span>Diabetes (type 1 or 2)</span></label>
+          <label class="check"><input type="checkbox" name="conditions" value="high_cholesterol"><span>High cholesterol</span></label>
+          <label class="check"><input type="checkbox" name="conditions" value="heart_disease"><span>Heart disease</span></label>
+          <label class="check"><input type="checkbox" name="conditions" value="stroke"><span>Previous stroke or TIA</span></label>
+          <label class="check"><input type="checkbox" name="conditions" value="kidney"><span>Kidney disease</span></label>
+          <label class="check"><input type="checkbox" name="conditions" value="peripheral_artery"><span>Peripheral artery disease</span></label>
+          <label class="check"><input type="checkbox" name="conditions" value="anaemia"><span>Anaemia</span></label>
+          <label class="check"><input type="checkbox" name="conditions" value="thyroid"><span>Thyroid disorder</span></label>
+        </div>
+      </fieldset>
+
+      <!-- =========================================== lifestyle ========== -->
+      <fieldset>
+        <legend>Lifestyle</legend>
+
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="smoking">Smoking</label>
+            <select id="smoking" name="smoking">
+              <option value="never">Never smoked</option>
+              <option value="former">Used to smoke</option>
+              <option value="current">Currently smoke</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="activity">Physical activity</label>
+            <span class="hint" id="act-hint">Roughly, in a typical week.</span>
+            <select id="activity" name="activity" aria-describedby="act-hint">
+              <option value="active">Active — exercise most days</option>
+              <option value="moderate">Moderate — some exercise weekly</option>
+              <option value="light">Light — occasional exercise</option>
+              <option value="sedentary">Sedentary — little or none</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="alcohol">Alcohol</label>
+            <select id="alcohol" name="alcohol">
+              <option value="none">None</option>
+              <option value="occasional">Occasional</option>
+              <option value="regular">Regular</option>
+              <option value="heavy">Heavy</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="sleep">Typical sleep</label>
+            <span class="hint" id="sleep-hint">Hours per night.</span>
+            <input type="number" id="sleep" name="sleep_hours" min="0" max="16" step="0.5"
+                   inputmode="decimal" aria-describedby="sleep-hint">
+          </div>
+        </div>
+
+        <label class="check" style="margin-top:.5rem">
+          <input type="checkbox" id="family_history" name="family_history">
+          <span>A parent or sibling has had heart disease, stroke or diabetes</span>
+        </label>
+      </fieldset>
+
+      <!-- ========================================= recording ============ -->
+      <fieldset>
+        <legend>Recording setup</legend>
+        <p class="small muted">Where you wear the band, and at what angle. These feed straight into
+        the velocity equation, so getting them right matters more than anything else on this page.</p>
+
+        <div class="grid grid-2">
+          <div class="field">
+            <label for="site">Measurement site</label>
+            <select id="site" name="site">
+              <option value="radial">Radial artery (wrist)</option>
+              <option value="ulnar">Ulnar artery (wrist)</option>
+              <option value="brachial">Brachial artery (upper arm)</option>
+              <option value="carotid">Carotid artery (neck)</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="angle">Insonation angle</label>
+            <span class="hint" id="angle-hint">
+              Degrees between the beam and the vessel. Velocity scales with cos θ, so this is the
+              single most influential setting. 60° is the default and the safest choice.
+            </span>
+            <input type="number" id="angle" name="angle_deg" min="0" max="89" step="1"
+                   value="60" inputmode="numeric" aria-describedby="angle-hint">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="medications">Medications you take regularly</label>
+          <span class="hint" id="meds-hint">
+            Free text. Several common medications change blood flow directly, so the analyst notes
+            them. Sonubrace will never suggest you start, stop or change any medication.
+          </span>
+          <textarea id="medications" name="medications" rows="3" aria-describedby="meds-hint"></textarea>
+        </div>
+      </fieldset>
+
+      <div class="row">
+        <button type="submit" class="btn btn-lg" id="submit">Save profile</button>
+        <a class="btn btn-lg btn-secondary" href="app.html">Skip to the monitor</a>
+      </div>
+    </form>
+
+  </div>
+</main>
+
+<footer class="site-footer" data-sonubrace-footer></footer>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/db.js"></script>
+<script src="assets/js/ai.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  'use strict';
+  var UI = SonubraceUI, DB = SonubraceDB;
+  var form = document.getElementById('profile-form');
+
+  UI.boot({ requireAuth: true }).then(function (user) {
+    if (!user) return;
+    return DB.getProfile().then(fill);
+  }).catch(function (e) { console.error(e); });
+
+  /* Restore a saved profile into the form. */
+  function fill(profile) {
+    if (!profile) return;
+    ['age','sex','height_cm','weight_kg','smoking','activity','alcohol','site'].forEach(function (k) {
+      var el = form.elements[k];
+      if (el && profile[k] !== null && profile[k] !== undefined) el.value = profile[k];
+    });
+    if (profile.systolic_mmhg)  document.getElementById('systolic').value = profile.systolic_mmhg;
+    if (profile.diastolic_mmhg) document.getElementById('diastolic').value = profile.diastolic_mmhg;
+    if (profile.fasting_glucose) document.getElementById('glucose').value = profile.fasting_glucose;
+    if (profile.sleep_hours)    document.getElementById('sleep').value = profile.sleep_hours;
+    if (profile.angle_deg)      document.getElementById('angle').value = profile.angle_deg;
+    if (profile.medications)    document.getElementById('medications').value = profile.medications;
+    document.getElementById('family_history').checked = !!profile.family_history;
+
+    (profile.conditions || []).forEach(function (c) {
+      var box = form.querySelector('input[name="conditions"][value="' + c + '"]');
+      if (box) box.checked = true;
+    });
+    updateBmi();
+  }
+
+  /* BMI shown as soon as both numbers exist — immediate feedback beats a
+     number that only appears after saving. */
+  function updateBmi() {
+    var h = Number(document.getElementById('height_cm').value);
+    var w = Number(document.getElementById('weight_kg').value);
+    var out = document.getElementById('bmi-readout');
+    if (h > 0 && w > 0) {
+      var bmi = w / Math.pow(h / 100, 2);
+      var band = bmi < 18.5 ? 'underweight' : bmi < 25 ? 'the healthy range'
+               : bmi < 30 ? 'the overweight range' : 'the obese range';
+      out.textContent = 'BMI ' + bmi.toFixed(1) + ' — ' + band + '.';
+    } else {
+      out.textContent = '';
+    }
+  }
+  document.getElementById('height_cm').addEventListener('input', updateBmi);
+  document.getElementById('weight_kg').addEventListener('input', updateBmi);
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    UI.clearFieldErrors(form);
+
+    var age = Number(document.getElementById('age').value);
+    if (!age || age < 1 || age > 120) {
+      UI.setFieldError(document.getElementById('age'), 'Enter your age in years.');
+      UI.showFormErrors(form, [{ id: 'age', message: 'Enter your age in years.' }]);
+      return;
+    }
+
+    var angle = Number(document.getElementById('angle').value);
+    if (angle >= 90 || angle < 0) {
+      var msg = 'The angle must be under 90°. At 90° the Doppler shift is zero and no velocity can be measured.';
+      UI.setFieldError(document.getElementById('angle'), msg);
+      UI.showFormErrors(form, [{ id: 'angle', message: msg }]);
+      return;
+    }
+
+    var conditions = Array.prototype.map.call(
+      form.querySelectorAll('input[name="conditions"]:checked'),
+      function (el) { return el.value; });
+
+    var profile = {
+      age: age,
+      sex: document.getElementById('sex').value || null,
+      height_cm: Number(document.getElementById('height_cm').value) || null,
+      weight_kg: Number(document.getElementById('weight_kg').value) || null,
+      systolic_mmhg: Number(document.getElementById('systolic').value) || null,
+      diastolic_mmhg: Number(document.getElementById('diastolic').value) || null,
+      fasting_glucose: Number(document.getElementById('glucose').value) || null,
+      conditions: conditions,
+      smoking: document.getElementById('smoking').value,
+      activity: document.getElementById('activity').value,
+      alcohol: document.getElementById('alcohol').value,
+      sleep_hours: Number(document.getElementById('sleep').value) || null,
+      family_history: document.getElementById('family_history').checked,
+      site: document.getElementById('site').value,
+      angle_deg: angle,
+      medications: document.getElementById('medications').value.trim()
+    };
+
+    var submit = document.getElementById('submit');
+    submit.disabled = true;
+    submit.textContent = 'Saving…';
+
+    DB.saveProfile(profile)
+      .then(function () {
+        UI.toast('Profile saved. Opening the monitor.', 'ok');
+        setTimeout(function () { location.href = 'app.html'; }, 800);
+      })
+      .catch(function (err) {
+        UI.showFormErrors(form, [{ id: 'age', message: err.message }]);
+        submit.disabled = false;
+        submit.textContent = 'Save profile';
+      });
+  });
+})();
+</script>
+</body>
+</html>

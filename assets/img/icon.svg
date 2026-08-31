@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Sonubrace">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#06657f"/>
+      <stop offset="0.55" stop-color="#6a35a8"/>
+      <stop offset="1" stop-color="#9c3d00"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <path d="M72 300 q40 -140 80 40 t80 -120 t80 150 t80 -110 t48 60"
+        fill="none" stroke="#ffffff" stroke-width="26"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="152" cy="340" r="14" fill="#ffd9a0"/>
+  <circle cx="312" cy="370" r="14" fill="#ffd9a0"/>
+</svg>

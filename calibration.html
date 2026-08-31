@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recordings — Sonubrace</title>
+<meta name="description" content="Your saved Sonubrace calibration recordings: rename them, compare parameters over time, export them for a clinician, or delete them.">
+<link rel="canonical" href="https://YOUR-USERNAME.github.io/sonubrace/calibration.html">
+<meta name="robots" content="noindex, follow">
+<meta name="theme-color" content="#06657f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2306657f'/%3E%3Cpath d='M6 20c3-8 5 6 8-2s5 6 8-4' stroke='%23fff' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/sonubrace.css">
+<script>try{var t=localStorage.getItem('sonubrace.theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+</head>
+
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="site-header" data-sonubrace-header></header>
+
+<main id="main">
+  <div class="wrap stack">
+
+    <div class="row row-between">
+      <div>
+        <h1 class="mb-0">Recordings</h1>
+        <p class="muted mb-0">Every calibration session you have saved. Names are yours to change.</p>
+      </div>
+      <div class="row">
+        <a class="btn" href="app.html">New recording</a>
+        <button type="button" class="btn btn-secondary" id="export-all">Export everything</button>
+      </div>
+    </div>
+
+    <!-- =========================================== trend summary ======== -->
+    <section class="card" aria-labelledby="trend-title" id="trend-section" hidden>
+      <div class="panel-head">
+        <h2 id="trend-title">Trend across your sessions</h2>
+        <span class="badge badge-info" id="trend-count">—</span>
+      </div>
+      <p class="small muted">
+        A single Doppler recording is a snapshot. The trend is what makes continuous monitoring
+        worth doing — so this is the view to bring to a clinician.
+      </p>
+      <div class="viz">
+        <canvas id="trend-canvas"></canvas>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--velocity)"></i> peak systolic velocity (m/s)</span>
+        <span><i style="background:var(--support)"></i> resistive index</span>
+      </div>
+    </section>
+
+    <!-- ================================================== list ========== -->
+    <section aria-labelledby="list-title">
+      <div class="panel-head">
+        <h2 id="list-title">Saved sessions</h2>
+        <div class="field" style="margin:0; min-width:200px">
+          <label for="sort" class="visually-hidden">Sort recordings</label>
+          <select id="sort">
+            <option value="new">Newest first</option>
+            <option value="old">Oldest first</option>
+            <option value="name">Name A–Z</option>
+            <option value="psv">Highest velocity first</option>
+            <option value="quality">Best signal quality first</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="recordings" class="grid grid-2" aria-live="polite"></div>
+      <p id="empty" hidden class="card center">
+        No recordings yet. <a href="app.html">Run your first session</a> — the simulator works
+        without any hardware.
+      </p>
+    </section>
+
+  </div>
+</main>
+
+<!-- ================================================ rename dialog ======= -->
+<dialog id="rename-dialog" class="card" style="max-width:min(460px,92vw); border:1px solid var(--line)">
+  <form method="dialog" id="rename-form">
+    <h2 id="rename-title">Rename recording</h2>
+    <div class="field">
+      <label for="rename-input">Recording name</label>
+      <span class="hint" id="rename-hint">Up to 80 characters. Something you will recognise in six months.</span>
+      <input type="text" id="rename-input" maxlength="80" aria-describedby="rename-hint" required>
+      <span class="error" id="rename-error"></span>
+    </div>
+    <div class="row">
+      <button type="submit" class="btn" value="save">Save name</button>
+      <button type="button" class="btn btn-secondary" id="rename-cancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<footer class="site-footer" data-sonubrace-footer></footer>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/db.js"></script>
+<script src="assets/js/dsp.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  'use strict';
+  var UI = SonubraceUI, DB = SonubraceDB;
+  var all = [];
+
+  UI.boot({ requireAuth: true }).then(function (user) {
+    if (!user) return;
+    return load();
+  }).catch(function (e) { console.error(e); });
+
+  function load() {
+    return DB.listRecordings().then(function (list) {
+      all = list || [];
+      renderList();
+      renderTrend();
+    }).catch(function (err) {
+      UI.toast(err.message, 'risk', 9000);
+    });
+  }
+
+  /* ---------------------------------------------------------- list ------ */
+
+  function sorted() {
+    var mode = document.getElementById('sort').value;
+    var copy = all.slice();
+    if (mode === 'old') copy.sort(byDate(1));
+    else if (mode === 'name') copy.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+    else if (mode === 'psv') copy.sort(function (a, b) { return (b.params.psv || 0) - (a.params.psv || 0); });
+    else if (mode === 'quality') copy.sort(function (a, b) { return (b.signal_quality || 0) - (a.signal_quality || 0); });
+    else copy.sort(byDate(-1));
+    return copy;
+  }
+  function byDate(dir) {
+    return function (a, b) {
+      return dir * (new Date(a.created_at) - new Date(b.created_at));
+    };
+  }
+
+  document.getElementById('sort').addEventListener('change', renderList);
+
+  function renderList() {
+    var host = document.getElementById('recordings');
+    var list = sorted();
+
+    document.getElementById('empty').hidden = list.length > 0;
+
+    host.innerHTML = list.map(function (r) {
+      var p = r.params || {};
+      var q = r.signal_quality || 0;
+      var qClass = q >= 0.7 ? 'badge-ok' : q >= 0.55 ? 'badge-warn' : 'badge-risk';
+      var patternClass = p.patternKey === 'laminar' ? 'badge-ok'
+                       : p.patternKey === 'turbulent' || p.patternKey === 'irregular' ? 'badge-risk'
+                       : 'badge-warn';
+
+      return '<article class="card">' +
+        '<div class="row row-between" style="align-items:flex-start">' +
+          '<div>' +
+            '<h3 style="margin-bottom:.15rem">' + UI.esc(r.name) + '</h3>' +
+            '<p class="small muted mb-0">' + UI.esc(UI.relativeTime(r.created_at)) + ' · ' +
+              UI.esc(r.site || 'radial') + ' · ' + (r.angle_deg || '—') + '° · ' +
+              (r.duration_s || 0).toFixed(1) + ' s' +
+              (r.source === 'device' ? ' · band' : ' · simulated') +
+            '</p>' +
+          '</div>' +
+          '<span class="badge ' + qClass + '">' + Math.round(q * 100) + '%</span>' +
+        '</div>' +
+
+        '<div class="grid grid-3" style="gap:.6rem; margin-top:.9rem">' +
+          tile('Velocity', UI.fmt(p.psv, 2) + ' m/s', 'velocity') +
+          tile('Direction', p.direction > 0 ? 'Forward' : p.direction < 0 ? 'Reverse' : 'Both', 'direction') +
+          tile('Pattern', UI.esc(p.patternName || '—'), 'pattern') +
+        '</div>' +
+
+        '<p class="small muted" style="margin-top:.8rem">' +
+          'RI ' + UI.fmt(p.ri, 2) + ' · PI ' + UI.fmt(p.pi, 2) + ' · EDV ' + UI.fmt(p.edv, 2) +
+          ' m/s · ' + Math.round(p.heartRateBpm || 0) + ' bpm' +
+        '</p>' +
+
+        (r.notes ? '<p class="small">' + UI.esc(r.notes) + '</p>' : '') +
+
+        '<div class="row" style="margin-top:.6rem">' +
+          '<a class="btn btn-sm" href="analysis.html?id=' + encodeURIComponent(r.id) + '">Analyse</a>' +
+          '<button type="button" class="btn btn-sm btn-secondary" data-rename="' + UI.esc(r.id) + '">Rename</button>' +
+          '<button type="button" class="btn btn-sm btn-secondary" data-note="' + UI.esc(r.id) + '">Add note</button>' +
+          '<button type="button" class="btn btn-sm btn-secondary" data-export="' + UI.esc(r.id) + '">Export</button>' +
+          '<button type="button" class="btn btn-sm btn-danger push" data-delete="' + UI.esc(r.id) + '">Delete</button>' +
+        '</div>' +
+        '<span class="badge ' + patternClass + '" style="margin-top:.6rem">' +
+          UI.esc(p.patternName || 'Unknown') + ' flow</span>' +
+      '</article>';
+    }).join('');
+  }
+
+  function tile(label, value, kind) {
+    return '<div class="metric metric-' + kind + '" style="padding:.6rem .7rem">' +
+      '<p class="metric-label" style="font-size:.7rem">' + label + '</p>' +
+      '<p class="metric-value" style="font-size:1.05rem">' + value + '</p></div>';
+  }
+
+  /* ------------------------------------------------------- actions ------ */
+
+  document.getElementById('recordings').addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+
+    if (btn.dataset.rename) openRename(btn.dataset.rename);
+    else if (btn.dataset.delete) confirmDelete(btn.dataset.delete);
+    else if (btn.dataset.export) exportOne(btn.dataset.export);
+    else if (btn.dataset.note) addNote(btn.dataset.note);
+  });
+
+  /* --- rename ----------------------------------------------------------- */
+
+  var dialog = document.getElementById('rename-dialog');
+  var renameInput = document.getElementById('rename-input');
+  var renameId = null;
+  var lastFocus = null;
+
+  function openRename(id) {
+    var rec = all.find(function (r) { return r.id === id; });
+    if (!rec) return;
+    renameId = id;
+    lastFocus = document.activeElement;
+    renameInput.value = rec.name;
+    document.getElementById('rename-error').textContent = '';
+
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else dialog.setAttribute('open', '');       /* older browsers */
+    renameInput.focus();
+    renameInput.select();
+  }
+
+  function closeRename() {
+    if (typeof dialog.close === 'function') dialog.close();
+    else dialog.removeAttribute('open');
+    if (lastFocus) lastFocus.focus();           /* return focus where it came from */
+  }
+
+  document.getElementById('rename-cancel').addEventListener('click', closeRename);
+
+  document.getElementById('rename-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = renameInput.value.trim();
+    var err = document.getElementById('rename-error');
+
+    if (!name) { err.textContent = 'Give the recording a name.'; renameInput.focus(); return; }
+
+    DB.renameRecording(renameId, name)
+      .then(function () {
+        var rec = all.find(function (r) { return r.id === renameId; });
+        if (rec) rec.name = name;
+        closeRename();
+        renderList();
+        UI.toast('Renamed to “' + name + '”.', 'ok');
+      })
+      .catch(function (e2) { err.textContent = e2.message; });
+  });
+
+  /* --- note -------------------------------------------------------------- */
+
+  function addNote(id) {
+    var rec = all.find(function (r) { return r.id === id; });
+    if (!rec) return;
+    var note = prompt('Note for “' + rec.name + '” — what were you doing, how did you feel?',
+                      rec.notes || '');
+    if (note === null) return;
+    DB.updateRecording(id, { notes: note.slice(0, 500) })
+      .then(function () { rec.notes = note.slice(0, 500); renderList(); UI.toast('Note saved.', 'ok'); })
+      .catch(function (e) { UI.toast(e.message, 'risk'); });
+  }
+
+  /* --- delete ------------------------------------------------------------ */
+
+  function confirmDelete(id) {
+    var rec = all.find(function (r) { return r.id === id; });
+    if (!rec) return;
+    /* Deletion is irreversible, so it asks by name rather than by "this item". */
+    if (!confirm('Delete “' + rec.name + '” permanently? This cannot be undone.')) return;
+
+    DB.deleteRecording(id)
+      .then(function () {
+        all = all.filter(function (r) { return r.id !== id; });
+        renderList(); renderTrend();
+        UI.toast('Deleted “' + rec.name + '”.', 'ok');
+      })
+      .catch(function (e) { UI.toast(e.message, 'risk'); });
+  }
+
+  /* --- export ------------------------------------------------------------ */
+
+  function safeFile(name) {
+    return String(name).replace(/[^a-z0-9\-_ ]/gi, '').trim().replace(/\s+/g, '-') || 'recording';
+  }
+
+  function exportOne(id) {
+    var rec = all.find(function (r) { return r.id === id; });
+    if (!rec) return;
+    UI.download('sonubrace-' + safeFile(rec.name) + '.json', JSON.stringify(rec, null, 2));
+  }
+
+  document.getElementById('export-all').addEventListener('click', function () {
+    DB.exportAll().then(function (bundle) {
+      UI.download('sonubrace-export-' + new Date().toISOString().slice(0, 10) + '.json',
+                  JSON.stringify(bundle, null, 2));
+      UI.toast('Exported your profile and ' + bundle.recordings.length + ' recordings.', 'ok');
+    }).catch(function (e) { UI.toast(e.message, 'risk'); });
+  });
+
+  /* ---------------------------------------------------------- trend ----- */
+  /*
+   * PSV and RI on one chart with two scales. Both are drawn as points joined
+   * in time order so a drift is visible at a glance; each point is also listed
+   * in the aria-label so the chart is not the only way to get the data.
+   */
+  function renderTrend() {
+    var section = document.getElementById('trend-section');
+    var series = all.slice().sort(byDate(1))
+      .filter(function (r) { return r.params && isFinite(r.params.psv); });
+
+    if (series.length < 2) { section.hidden = true; return; }
+    section.hidden = false;
+    document.getElementById('trend-count').textContent = series.length + ' sessions';
+
+    var canvas = document.getElementById('trend-canvas');
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var W = canvas.clientWidth || 640, H = 240;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.height = H + 'px';
+    var ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    var cs = getComputedStyle(document.documentElement);
+    function v(n, f) { return (cs.getPropertyValue(n) || '').trim() || f; }
+
+    ctx.fillStyle = v('--surface', '#fff'); ctx.fillRect(0, 0, W, H);
+
+    var padL = 50, padR = 50, padT = 18, padB = 34;
+    var pw = W - padL - padR, ph = H - padT - padB;
+
+    var psvMax = Math.max.apply(null, series.map(function (r) { return r.params.psv; })) * 1.2 || 1;
+
+    function x(i) { return padL + (pw * i) / Math.max(1, series.length - 1); }
+    function yPsv(val) { return padT + ph - (val / psvMax) * ph; }
+    function yRi(val) { return padT + ph - Math.min(1, val) * ph; }
+
+    /* grid */
+    ctx.strokeStyle = v('--line', '#cfe0ea');
+    ctx.fillStyle = v('--ink-2', '#3d5364');
+    ctx.font = '600 11px ' + v('--font', 'system-ui');
+    ctx.textBaseline = 'middle';
+    for (var g = 0; g <= 4; g++) {
+      var yy = padT + (ph * g) / 4;
+      ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(W - padR, yy); ctx.stroke();
+      ctx.textAlign = 'right';
+      ctx.fillText((psvMax * (1 - g / 4)).toFixed(2), padL - 8, yy);
+      ctx.textAlign = 'left';
+      ctx.fillText((1 - g / 4).toFixed(2), W - padR + 8, yy);
+    }
+
+    function series_(getY, key, colour) {
+      ctx.beginPath();
+      series.forEach(function (r, i) {
+        var px = x(i), py = getY(r.params[key] || 0);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      });
+      ctx.strokeStyle = colour; ctx.lineWidth = 2.4; ctx.stroke();
+      series.forEach(function (r, i) {
+        ctx.fillStyle = colour;
+        ctx.beginPath(); ctx.arc(x(i), getY(r.params[key] || 0), 4, 0, 2 * Math.PI); ctx.fill();
+      });
+    }
+
+    series_(yPsv, 'psv', v('--velocity', '#0c6b47'));
+    series_(yRi, 'ri', v('--support', '#a02440'));
+
+    ctx.fillStyle = v('--ink-2', '#3d5364');
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    series.forEach(function (r, i) {
+      if (series.length > 8 && i % Math.ceil(series.length / 8) !== 0) return;
+      ctx.fillText(new Date(r.created_at).toLocaleDateString(undefined,
+        { month: 'short', day: 'numeric' }), x(i), padT + ph + 8);
+    });
+
+    canvas.setAttribute('role', 'img');
+    canvas.setAttribute('aria-label',
+      'Trend across ' + series.length + ' sessions. ' +
+      series.map(function (r) {
+        return r.name + ': PSV ' + UI.fmt(r.params.psv, 2) + ' metres per second, RI ' +
+               UI.fmt(r.params.ri, 2);
+      }).join('. ') + '.');
+  }
+
+  var rt;
+  window.addEventListener('resize', function () {
+    clearTimeout(rt); rt = setTimeout(renderTrend, 200);
+  });
+})();
+</script>
+</body>
+</html>

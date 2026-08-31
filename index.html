@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Sonubrace — Continuous Doppler Ultrasound Monitoring for NCD Screening</title>
+<meta name="description" content="Sonubrace is a wrist-worn Doppler ultrasound platform for continuous haemodynamic monitoring and early screening of non-communicable diseases. See your blood-flow velocity, direction and pattern as a live Doppler spectrogram, with a plain-language explanation of every number.">
+<meta name="keywords" content="Doppler ultrasound, haemodynamic monitoring, NCD screening, blood flow velocity, Doppler spectrogram, truncated long code, resistive index, pulsatility index, wearable ultrasound">
+<meta name="author" content="Sonubrace research project">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://YOUR-USERNAME.github.io/sonubrace/">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Sonubrace">
+<meta property="og:title" content="Sonubrace — Continuous Doppler Ultrasound Monitoring">
+<meta property="og:description" content="Wrist-worn Doppler ultrasound for continuous haemodynamic monitoring and early NCD screening. Velocity, flow direction and flow pattern, explained in plain language.">
+<meta property="og:url" content="https://YOUR-USERNAME.github.io/sonubrace/">
+<meta property="og:locale" content="en">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Sonubrace — Continuous Doppler Ultrasound Monitoring">
+<meta name="twitter:description" content="See your blood-flow velocity, direction and pattern as a live Doppler spectrogram, explained in plain language.">
+
+<meta name="theme-color" content="#06657f" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f2231" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2306657f'/%3E%3Cpath d='M6 20c3-8 5 6 8-2s5 6 8-4' stroke='%23fff' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+
+<link rel="stylesheet" href="assets/css/sonubrace.css">
+<script>
+  /* Apply the stored theme before first paint so there is no flash. */
+  try { var t = localStorage.getItem('sonubrace.theme');
+        if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://YOUR-USERNAME.github.io/sonubrace/#website",
+      "name": "Sonubrace",
+      "url": "https://YOUR-USERNAME.github.io/sonubrace/",
+      "description": "Continuous Doppler ultrasound monitoring and early screening for non-communicable diseases.",
+      "inLanguage": "en"
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "Sonubrace",
+      "applicationCategory": "HealthApplication",
+      "operatingSystem": "Any modern web browser",
+      "url": "https://YOUR-USERNAME.github.io/sonubrace/",
+      "description": "Web platform for the Sonubrace wrist-worn Doppler ultrasound monitor. Streams baseband I/Q over Bluetooth Low Energy, computes the Doppler spectrogram by short-time Fourier transform, and reports blood-flow velocity, direction and pattern with supporting indices.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "featureList": [
+        "Live Doppler spectrogram",
+        "Blood-flow velocity, direction and pattern",
+        "Resistive index, pulsatility index, PSV and EDV",
+        "IMU angle guidance during calibration",
+        "Machine-learning interpretation and NCD risk flags"
+      ]
+    },
+    {
+      "@type": "MedicalWebPage",
+      "name": "How Sonubrace measures haemodynamics",
+      "url": "https://YOUR-USERNAME.github.io/sonubrace/methods.html",
+      "audience": { "@type": "Audience", "audienceType": "General public and researchers" },
+      "about": { "@type": "MedicalCondition", "name": "Non-communicable diseases" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What does Sonubrace measure?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Three main parameters: blood-flow velocity, blood-flow direction, and blood-flow pattern. From those it derives supporting indices including peak systolic velocity, end-diastolic velocity, resistive index and pulsatility index." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Sonubrace a diagnostic device?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Sonubrace is a screening and monitoring aid. It highlights haemodynamic patterns worth discussing with a clinician and does not diagnose any condition." }
+        },
+        {
+          "@type": "Question",
+          "name": "Why does Sonubrace use a truncated long code?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Coded excitation lets a long, energetic waveform be compressed on receive, improving signal-to-noise without losing resolution. Truncating one long sequence into segments means each transmit burst carries a different segment, so the receiver can separate overlapping echoes and keep the Doppler signal continuous." }
+        },
+        {
+          "@type": "Question",
+          "name": "Why is the probe angle important?",
+          "acceptedAnswer": { "@type": "Answer", "text": "The Doppler equation contains cos of the insonation angle, so the angle scales every velocity reading. At 90 degrees the cosine is zero and no velocity can be measured. Sonubrace targets 60 degrees, where the cosine changes slowly and small movements barely affect the result." }
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="site-header" data-sonubrace-header></header>
+
+<main id="main">
+  <div class="wrap stack">
+
+    <!-- ================================================ hero ============ -->
+    <section class="hero" aria-labelledby="hero-title">
+      <p class="eyebrow">Continuous haemodynamic monitoring</p>
+      <h1 id="hero-title">See how your blood is actually flowing</h1>
+      <p style="font-size:1.15rem; max-width:60ch">
+        Sonubrace is a wrist-worn Doppler ultrasound band and this is its platform. It turns the
+        echoes bouncing off your blood cells into three things you can read: how fast the blood is
+        moving, which way it is going, and whether it is flowing smoothly — then explains what the
+        picture means in ordinary words.
+      </p>
+      <div class="row" style="margin-top:1.5rem">
+        <a class="btn btn-lg btn-secondary" href="register.html">Create your account</a>
+        <a class="btn btn-lg btn-ghost" href="app.html" style="color:#fff; border-color:rgba(255,255,255,.5)">Open the monitor</a>
+      </div>
+      <p class="small" style="margin-top:1rem; color:#cdeefb">
+        No band yet? The monitor includes a full simulator, so you can explore every screen without hardware.
+      </p>
+    </section>
+
+    <!-- ========================================= three parameters ======= -->
+    <section aria-labelledby="params-title" class="mt-3">
+      <h2 id="params-title">The three parameters Sonubrace measures</h2>
+      <p>
+        Everything else on this platform is derived from these three. They were chosen because
+        together they describe a circulation completely enough to spot the haemodynamic changes
+        that sit behind most non-communicable diseases.
+      </p>
+
+      <div class="grid grid-3 mt-2">
+        <article class="card metric metric-velocity">
+          <h3 class="metric-label">Parameter 1</h3>
+          <p class="metric-value" style="font-size:1.5rem">Velocity</p>
+          <p class="metric-note">
+            How fast the blood moves, in metres per second. Found by taking the strongest frequency in
+            each slice of the spectrogram and converting it with the Doppler equation. Peak systolic
+            and end-diastolic velocity come straight from this.
+          </p>
+        </article>
+
+        <article class="card metric metric-direction">
+          <h3 class="metric-label">Parameter 2</h3>
+          <p class="metric-value" style="font-size:1.5rem">Direction</p>
+          <p class="metric-note">
+            Which way the blood is travelling past the probe. A positive Doppler shift means toward
+            it, negative means away. Splitting the echo into in-phase and quadrature channels is what
+            preserves that sign instead of collapsing it to a magnitude.
+          </p>
+        </article>
+
+        <article class="card metric metric-pattern">
+          <h3 class="metric-label">Parameter 3</h3>
+          <p class="metric-value" style="font-size:1.5rem">Pattern</p>
+          <p class="metric-note">
+            Whether the flow is smooth, pulsatile, turbulent or irregular. Built from three
+            measurements: how regularly the waveform repeats, how widely the velocities are spread,
+            and the shape of the waveform itself.
+          </p>
+        </article>
+      </div>
+
+      <div class="card mt-2 card-accent">
+        <h3>Supporting indices</h3>
+        <p>
+          These are computed <em>from</em> the three parameters above, not measured separately. They
+          are the numbers a clinician will recognise.
+        </p>
+        <div class="grid grid-4">
+          <div><strong>PSV</strong><p class="small mb-0">Peak systolic velocity — the fastest point of each beat.</p></div>
+          <div><strong>EDV</strong><p class="small mb-0">End-diastolic velocity — flow just before the next beat.</p></div>
+          <div><strong>RI</strong><p class="small mb-0">(PSV − EDV) / PSV — resistance downstream.</p></div>
+          <div><strong>PI</strong><p class="small mb-0">(PSV − EDV) / mean — vessel elasticity and flow variability.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================= how it works === -->
+    <section aria-labelledby="how-title" class="mt-3">
+      <h2 id="how-title">How a reading is produced</h2>
+      <ol class="steps mt-2">
+        <li>
+          <strong>Transmit.</strong> The microcontroller clocks out an ultrasound pulse, multiplies it
+          by one segment of a truncated long code, mixes it with the carrier, and the DAC hands it to
+          the transducer through the transmit/receive switch.
+        </li>
+        <li>
+          <strong>Receive.</strong> The echo comes back carrying the Doppler shift. It is amplified,
+          time-gain compensated, band-pass filtered and digitised.
+        </li>
+        <li>
+          <strong>Demodulate and decode.</strong> The digitised echo goes to two mixers a quarter cycle
+          apart — in-phase and quadrature — then through a matched filter against the same code
+          segment that was transmitted. What comes out is the Doppler signal, with its sign intact.
+        </li>
+        <li>
+          <strong>Transform.</strong> A short-time Fourier transform turns that signal into P(f, t),
+          the Doppler spectrogram: what frequencies were present at each moment.
+        </li>
+        <li>
+          <strong>Measure.</strong> The envelope is traced across the spectrogram, the cardiac cycles
+          are segmented, and the three parameters plus the supporting indices are computed.
+        </li>
+        <li>
+          <strong>Explain.</strong> The analyst combines those numbers with your health profile to
+          describe what the picture shows and flag anything worth a clinician's attention.
+        </li>
+      </ol>
+      <p class="mt-2">
+        <a href="methods.html">Read the full method, with every equation →</a>
+      </p>
+    </section>
+
+    <!-- ==================================================== platform ==== -->
+    <section aria-labelledby="platform-title" class="mt-3">
+      <h2 id="platform-title">What you get on the platform</h2>
+      <div class="grid grid-2 mt-2">
+        <article class="card">
+          <h3>Live monitor</h3>
+          <p>Connect the band over Bluetooth, or run the simulator. The spectrogram, the velocity
+          envelope, all three parameters and the supporting indices update as you record.</p>
+        </article>
+        <article class="card">
+          <h3>IMU angle guidance</h3>
+          <p>A live illustration of your forearm, the band and the beam, showing your angle against
+          the target and telling you when to hold still — because angle error distorts every velocity
+          number.</p>
+        </article>
+        <article class="card">
+          <h3>Named recordings</h3>
+          <p>Save each calibration session under a name you choose, rename it whenever you like,
+          compare sessions over time and export everything as JSON for a clinician.</p>
+        </article>
+        <article class="card">
+          <h3>An analyst that answers back</h3>
+          <p>A plain-language walkthrough of your spectrogram, NCD risk flags with the reasoning
+          shown, risk-management suggestions, and a chat that answers questions about your own
+          recording.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ======================================================= safety === -->
+    <section aria-labelledby="safety-title" class="mt-3">
+      <h2 id="safety-title">What Sonubrace is not</h2>
+      <div class="alert alert-warn">
+        <div>
+          <h3>A screening aid, not a diagnosis</h3>
+          <p>
+            Sonubrace measures haemodynamics and highlights patterns. It cannot diagnose hypertension,
+            diabetes, heart disease or anything else, and it is not a substitute for clinical
+            assessment. Its risk score is a priority for review, not a probability of illness.
+          </p>
+          <p class="mb-0">
+            If you have chest pain, sudden weakness, difficulty speaking, or a limb that becomes cold,
+            pale or painful, seek emergency care immediately rather than taking a reading.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card card-accent center mt-3" aria-labelledby="cta-title">
+      <h2 id="cta-title">Start with a simulated session</h2>
+      <p style="margin-inline:auto">Create an account, answer the health questionnaire that feeds the
+      analysis, and run your first recording in about two minutes.</p>
+      <div class="row" style="justify-content:center">
+        <a class="btn btn-lg" href="register.html">Create your account</a>
+        <a class="btn btn-lg btn-secondary" href="methods.html">Read the methods</a>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site-footer" data-sonubrace-footer></footer>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/db.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>SonubraceUI.boot();</script>
+</body>
+</html>

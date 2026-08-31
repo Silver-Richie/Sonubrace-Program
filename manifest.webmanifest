@@ -1,0 +1,21 @@
+{
+  "name": "Sonubrace — Continuous Doppler Haemodynamic Monitoring",
+  "short_name": "Sonubrace",
+  "description": "Wrist-worn Doppler ultrasound monitoring for haemodynamic screening of non-communicable diseases.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4fafd",
+  "theme_color": "#06657f",
+  "lang": "en",
+  "categories": ["health", "medical", "science"],
+  "icons": [
+    {
+      "src": "assets/img/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

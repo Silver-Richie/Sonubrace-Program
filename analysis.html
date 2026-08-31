@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analysis — Sonubrace</title>
+<meta name="description" content="Plain-language explanation of your Doppler spectrogram, NCD risk flags with the reasoning shown, risk-management suggestions, and an analyst that answers questions about your own recording.">
+<link rel="canonical" href="https://YOUR-USERNAME.github.io/sonubrace/analysis.html">
+<meta name="robots" content="noindex, follow">
+<meta name="theme-color" content="#06657f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2306657f'/%3E%3Cpath d='M6 20c3-8 5 6 8-2s5 6 8-4' stroke='%23fff' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/sonubrace.css">
+<script>try{var t=localStorage.getItem('sonubrace.theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+</head>
+
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="site-header" data-sonubrace-header></header>
+
+<main id="main">
+  <div class="wrap stack">
+
+    <div class="row row-between">
+      <div>
+        <h1 class="mb-0">Analysis</h1>
+        <p class="muted mb-0" id="subject">Loading…</p>
+      </div>
+      <div class="field" style="margin:0; min-width:220px">
+        <label for="pick" class="visually-hidden">Choose a recording to analyse</label>
+        <select id="pick"></select>
+      </div>
+    </div>
+
+    <div id="no-data" class="card center" hidden>
+      <h2>Nothing to analyse yet</h2>
+      <p>Run a recording first — the simulator on the monitor page works without any hardware.</p>
+      <a class="btn" href="app.html">Open the monitor</a>
+    </div>
+
+    <div id="content" hidden>
+
+      <!-- ================================================ summary ======= -->
+      <section class="card card-accent" aria-labelledby="summary-title">
+        <div class="panel-head">
+          <h2 id="summary-title">What this recording shows</h2>
+          <span class="badge" id="risk-badge">—</span>
+        </div>
+        <p style="font-size:1.08rem" id="summary-text"></p>
+
+        <div class="grid grid-3">
+          <div class="metric metric-velocity">
+            <p class="metric-label">Velocity</p>
+            <p class="metric-value"><span id="s-psv">—</span><span class="metric-unit">m/s</span></p>
+            <p class="metric-note">peak systolic</p>
+          </div>
+          <div class="metric metric-direction">
+            <p class="metric-label">Direction</p>
+            <p class="metric-value" style="font-size:1.3rem" id="s-dir">—</p>
+            <p class="metric-note" id="s-dir-note">—</p>
+          </div>
+          <div class="metric metric-pattern">
+            <p class="metric-label">Pattern</p>
+            <p class="metric-value" style="font-size:1.3rem" id="s-pattern">—</p>
+            <p class="metric-note" id="s-pattern-note">—</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ spectrogram ======= -->
+      <section class="card mt-2" aria-labelledby="spec-title">
+        <h2 id="spec-title">Reading your spectrogram</h2>
+        <p class="muted">
+          The methods behind this platform ask that the spectrogram be understandable to anyone, not
+          only to a sonographer. This walks the picture in the order your eye moves across it.
+        </p>
+
+        <h3 class="mt-2">Velocity envelope</h3>
+        <div class="viz"><canvas id="envelope"></canvas></div>
+        <p class="viz-caption">Red dots mark each peak systolic velocity; blue dots mark end-diastole.
+        Those two points are where RI, PI and the S/D ratio come from.</p>
+
+        <h3 class="mt-2">How regularly it repeats</h3>
+        <div class="viz"><canvas id="autocorr"></canvas></div>
+        <p class="viz-caption">The autocorrelation Rxx(τ): how well the trace matches a shifted copy of
+        itself. The dashed line marks the cycle length it found.</p>
+
+        <div id="spec-explanation" class="mt-2"></div>
+      </section>
+
+      <!-- =============================================== findings ======= -->
+      <section class="mt-2" aria-labelledby="findings-title">
+        <h2 id="findings-title">Findings</h2>
+        <p class="muted">Sorted by how much attention each deserves. Every one names the number it
+        came from, so you can check the reasoning rather than take it on trust.</p>
+        <div id="findings" class="stack"></div>
+      </section>
+
+      <!-- =================================================== risk ======= -->
+      <section class="card mt-2" aria-labelledby="risk-title">
+        <div class="panel-head">
+          <h2 id="risk-title">NCD review priority</h2>
+          <span class="badge" id="risk-score-badge">—</span>
+        </div>
+
+        <div class="alert" id="risk-alert">
+          <div>
+            <h3 id="risk-level-title">—</h3>
+            <p class="mb-0" id="risk-level-text">—</p>
+          </div>
+        </div>
+
+        <h3>What contributed to the score</h3>
+        <div class="table-scroll">
+          <table>
+            <caption>Every factor the model counted, largest first</caption>
+            <thead>
+              <tr><th scope="col">Factor</th><th scope="col">Domain</th><th scope="col" class="num">Points</th></tr>
+            </thead>
+            <tbody id="risk-flags"></tbody>
+          </table>
+        </div>
+
+        <h3 class="mt-2">Risk management</h3>
+        <ul id="management" class="stack"></ul>
+      </section>
+
+      <!-- ==================================================== chat ====== -->
+      <section class="card mt-2" aria-labelledby="chat-title">
+        <div class="panel-head">
+          <h2 id="chat-title">Ask about your recording</h2>
+          <span class="badge" id="ai-engine">Built-in analyst</span>
+        </div>
+        <p class="muted small">
+          Answers are computed from the numbers in this recording and your health profile.
+        </p>
+
+        <div class="chat-log" id="chat-log" role="log" aria-live="polite" aria-label="Conversation with the Sonubrace analyst"></div>
+
+        <div class="suggestions" id="suggestions"></div>
+
+        <form class="chat-form" id="chat-form">
+          <div class="field" style="flex:1; margin:0">
+            <label for="question" class="visually-hidden">Your question</label>
+            <textarea id="question" rows="2" placeholder="e.g. why is my velocity high?" required></textarea>
+          </div>
+          <button type="submit" class="btn" id="ask-btn">Ask</button>
+        </form>
+
+        <details class="disclose mt-2">
+          <summary>Connect Claude for free-form questions (optional)</summary>
+          <p class="small">
+            The built-in analyst answers from fixed rules, which makes it reproducible. Adding a
+            Claude API key lets you ask anything in your own words, still grounded in this
+            recording's numbers.
+          </p>
+          <div class="alert alert-warn">
+            <div>
+              <h3>About the key</h3>
+              <p class="mb-0">
+                The key is stored in this browser's local storage and sent directly from this page to
+                Anthropic. Anyone with access to this browser profile can read it, and it is not
+                suitable for a shared or public machine. For a real deployment, proxy the request
+                through a server so the key never reaches the browser.
+              </p>
+            </div>
+          </div>
+          <div class="field">
+            <label for="claude-key">Anthropic API key</label>
+            <input type="password" id="claude-key" autocomplete="off" placeholder="sk-ant-…">
+          </div>
+          <div class="row">
+            <button type="button" class="btn btn-sm" id="save-key">Save key</button>
+            <button type="button" class="btn btn-sm btn-secondary" id="clear-key">Remove key</button>
+          </div>
+        </details>
+      </section>
+
+      <!-- ================================================ report ======== -->
+      <section class="card mt-2" aria-labelledby="report-title">
+        <h2 id="report-title">Take this to a clinician</h2>
+        <p>Download the whole analysis — parameters, findings, risk factors and the explanation — as
+        a single file you can print or send.</p>
+        <div class="row">
+          <button type="button" class="btn" id="download-report">Download analysis</button>
+          <button type="button" class="btn btn-secondary" onclick="window.print()">Print this page</button>
+        </div>
+        <p class="small muted mt-2 mb-0" id="disclaimer"></p>
+      </section>
+
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer" data-sonubrace-footer></footer>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/db.js"></script>
+<script src="assets/js/dsp.js"></script>
+<script src="assets/js/spectrogram.js"></script>
+<script src="assets/js/ai.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  'use strict';
+  var UI = SonubraceUI, DB = SonubraceDB, AI = SonubraceAI, VIZ = SonubraceViz;
+
+  var recordings = [];
+  var current = null;      /* a result-shaped object for the AI + charts */
+  var report = null;
+  var profile = null;
+  var history = [];
+
+  UI.boot({ requireAuth: true }).then(function (user) {
+    if (!user) return;
+    return Promise.all([DB.getProfile(), DB.listRecordings()]);
+  }).then(function (r) {
+    if (!r) return;
+    profile = r[0];
+    recordings = r[1] || [];
+    buildPicker();
+    chooseInitial();
+  }).catch(function (e) {
+    console.error(e);
+    UI.toast('Could not load your recordings: ' + e.message, 'risk', 9000);
+  });
+
+  /* --------------------------------------------------------- picking ---- */
+
+  function buildPicker() {
+    var sel = document.getElementById('pick');
+    sel.innerHTML = '';
+
+    if (sessionResult()) {
+      var o = document.createElement('option');
+      o.value = 'session';
+      o.textContent = 'Latest unsaved recording';
+      sel.appendChild(o);
+    }
+    recordings.forEach(function (r) {
+      var opt = document.createElement('option');
+      opt.value = r.id;
+      opt.textContent = r.name + ' — ' + UI.relativeTime(r.created_at);
+      sel.appendChild(opt);
+    });
+
+    sel.addEventListener('change', function () { show(sel.value); });
+  }
+
+  function sessionResult() {
+    try {
+      var raw = sessionStorage.getItem('sonubrace.lastResult');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function chooseInitial() {
+    var id = UI.qs('id');
+    var from = UI.qs('from');
+    var sel = document.getElementById('pick');
+
+    if (id && recordings.some(function (r) { return r.id === id; })) { sel.value = id; show(id); return; }
+    if (from === 'session' && sessionResult()) { sel.value = 'session'; show('session'); return; }
+    if (sessionResult()) { sel.value = 'session'; show('session'); return; }
+    if (recordings.length) { sel.value = recordings[0].id; show(recordings[0].id); return; }
+
+    document.getElementById('no-data').hidden = false;
+    document.getElementById('subject').textContent = 'No recordings found.';
+  }
+
+  /* Both a saved row and a session result are normalised into the shape the
+     charts and the AI expect, so downstream code has one contract. */
+  function toResult(src, name) {
+    var e = src.envelope || {};
+    var n = e.nFrames || (e.vPeak ? e.vPeak.length : 0);
+    return {
+      name: name,
+      params: src.params,
+      durationS: src.durationS || src.duration_s || (n * (e.dt || 0.016)),
+      /* A stored recording keeps the cycle COUNT and rate but not the per-frame
+         landmark indices — those come from a live segmentation pass and are
+         deliberately not persisted. Normalise the arrays to empty so the charts
+         can test for them rather than indexing into undefined. */
+      cycles: {
+        nCycles:        (src.cycles && src.cycles.nCycles) || 0,
+        heartRateBpm:   (src.cycles && src.cycles.heartRateBpm) || src.params.heartRateBpm || 0,
+        hrVariabilityMs:(src.cycles && src.cycles.hrVariabilityMs) || src.params.hrVariabilityMs || 0,
+        systolicPeak:   (src.cycles && src.cycles.systolicPeak) || null,
+        onset:          (src.cycles && src.cycles.onset) || null
+      },
+      envelope: {
+        nFrames: n,
+        dt: e.dt || 0.016,
+        vPeak: Float64Array.from(e.vPeak || []),
+        time: Float64Array.from(e.time || []),
+        bw: Float64Array.from(e.bw || []),
+        fdPeak: Float64Array.from((e.vPeak || []).map(function () { return 0; })),
+        power: Float64Array.from((e.vPeak || []).map(function () { return 1; }))
+      },
+      config: src.config || null,
+      source: src.source || 'simulation',
+      truth: src.truth || null
+    };
+  }
+
+  function show(key) {
+    var src, name;
+    if (key === 'session') {
+      src = sessionResult();
+      name = 'Latest unsaved recording';
+    } else {
+      var rec = recordings.find(function (r) { return r.id === key; });
+      if (!rec) return;
+      src = rec;
+      name = rec.name;
+    }
+    if (!src || !src.params) { document.getElementById('no-data').hidden = false; return; }
+
+    current = toResult(src, name);
+    document.getElementById('no-data').hidden = true;
+    document.getElementById('content').hidden = false;
+    document.getElementById('subject').textContent =
+      name + ' · ' + current.durationS.toFixed(1) + ' s · ' +
+      (current.source === 'device' ? 'recorded with the band' : 'simulated');
+
+    report = AI.analyse(current, profile, null);
+    history = [];
+    renderAll();
+  }
+
+  /* ------------------------------------------------------- rendering ---- */
+
+  function renderAll() {
+    var p = current.params;
+
+    /* --- summary --- */
+    document.getElementById('summary-text').textContent = report.summary;
+    document.getElementById('s-psv').textContent = UI.fmt(p.psv, 2);
+    document.getElementById('s-dir').textContent =
+      p.direction > 0 ? 'Forward' : p.direction < 0 ? 'Reverse' : 'Bidirectional';
+    document.getElementById('s-dir-note').textContent =
+      Math.round(Math.max(p.forwardFraction, p.reverseFraction) * 100) + '% of signal power';
+    document.getElementById('s-pattern').textContent = p.patternName;
+    document.getElementById('s-pattern-note').textContent =
+      'periodicity ' + UI.fmt(p.periodicity, 2);
+
+    var rb = document.getElementById('risk-badge');
+    rb.textContent = report.risk.level + ' priority';
+    rb.className = 'badge ' + (report.risk.level === 'high' ? 'badge-risk'
+      : report.risk.level === 'moderate' ? 'badge-warn' : 'badge-ok');
+
+    /* --- charts --- */
+    if (current.envelope.nFrames > 1) {
+      VIZ.drawEnvelope(document.getElementById('envelope'), current, { height: 220 });
+      VIZ.drawAutocorrelation(document.getElementById('autocorr'), current, { height: 180 });
+    }
+
+    /* --- spectrogram explanation --- */
+    document.getElementById('spec-explanation').innerHTML =
+      report.spectrogramExplanation.map(function (part) {
+        return '<div class="card" style="margin-bottom:.9rem">' +
+          '<h3>' + UI.esc(part.heading) + '</h3><p class="mb-0">' + UI.esc(part.text) + '</p></div>';
+      }).join('');
+
+    /* --- findings --- */
+    var sev = { urgent: 'alert-risk', attention: 'alert-risk', watch: 'alert-warn', info: 'alert-ok' };
+    var label = { urgent: 'Urgent', attention: 'Needs attention', watch: 'Worth watching', info: 'Normal' };
+    document.getElementById('findings').innerHTML = report.findings.map(function (f) {
+      return '<div class="alert ' + sev[f.severity] + '">' +
+        '<div>' +
+          '<span class="badge">' + label[f.severity] + ' · ' + UI.esc(f.parameter) + '</span>' +
+          '<h3 style="margin-top:.4rem">' + UI.esc(f.title) + '</h3>' +
+          '<p>' + UI.esc(f.detail) + '</p>' +
+          '<p class="mb-0"><strong>What to do:</strong> ' + UI.esc(f.action) + '</p>' +
+        '</div></div>';
+    }).join('');
+
+    /* --- risk --- */
+    var r = report.risk;
+    document.getElementById('risk-score-badge').textContent = r.score + ' / 100';
+    var alertBox = document.getElementById('risk-alert');
+    alertBox.className = 'alert ' + (r.level === 'high' ? 'alert-risk'
+      : r.level === 'moderate' ? 'alert-warn' : 'alert-ok');
+    document.getElementById('risk-level-title').textContent =
+      r.level === 'high' ? 'High review priority'
+      : r.level === 'moderate' ? 'Moderate review priority' : 'Low review priority';
+    document.getElementById('risk-level-text').textContent =
+      (r.level === 'high'
+        ? 'Enough here is outside the expected range that a clinician should look at it. '
+        : r.level === 'moderate'
+          ? 'A few features are worth keeping an eye on across further sessions. '
+          : 'Nothing here stands out as needing attention. ') +
+      'This score is a priority for review, not a probability of disease — Sonubrace cannot diagnose anything.' +
+      (r.reliable ? '' : ' Note that signal quality was low, so treat it as provisional.');
+
+    document.getElementById('risk-flags').innerHTML = r.flags.length
+      ? r.flags.map(function (f) {
+          return '<tr><th scope="row">' + UI.esc(f.reason) + '</th>' +
+                 '<td>' + UI.esc(f.domain) + '</td>' +
+                 '<td class="num mono">+' + f.points + '</td></tr>';
+        }).join('')
+      : '<tr><td colspan="3">No risk factors were counted for this recording.</td></tr>';
+
+    document.getElementById('management').innerHTML = report.management.map(function (m) {
+      var tag = m.priority === 'urgent' ? 'badge-risk'
+              : m.priority === 'important' ? 'badge-warn'
+              : m.priority === 'first' ? 'badge-warn' : 'badge-info';
+      return '<li class="card"><span class="badge ' + tag + '">' + UI.esc(m.priority) + '</span>' +
+             '<p class="mb-0" style="margin-top:.5rem">' + UI.esc(m.text) + '</p></li>';
+    }).join('');
+
+    document.getElementById('disclaimer').textContent = report.disclaimer;
+
+    /* --- chat --- */
+    document.getElementById('chat-log').innerHTML = '';
+    history = [];
+    pushAI({
+      title: 'Your recording is ready to discuss',
+      body: report.summary,
+      points: ['Ask me anything about it — or start with one of the suggestions below.']
+    });
+    renderSuggestions();
+    updateEngineBadge();
+  }
+
+  /* ------------------------------------------------------------ chat ---- */
+
+  function pushUser(text) {
+    var log = document.getElementById('chat-log');
+    var el = document.createElement('div');
+    el.className = 'msg msg-user';
+    el.textContent = text;
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+    history.push({ role: 'user', text: text });
+  }
+
+  function pushAI(answer) {
+    var log = document.getElementById('chat-log');
+    var el = document.createElement('div');
+    el.className = 'msg msg-ai';
+    var html = '';
+    if (answer.title) html += '<h4>' + UI.esc(answer.title) + '</h4>';
+    if (answer.notice) html += '<p class="small muted">' + UI.esc(answer.notice) + '</p>';
+    html += '<p>' + UI.esc(answer.body).replace(/\n\n/g, '</p><p>') + '</p>';
+    if (answer.points && answer.points.length) {
+      html += '<ul>' + answer.points.map(function (p) { return '<li>' + UI.esc(p) + '</li>'; }).join('') + '</ul>';
+    }
+    el.innerHTML = html;
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+    history.push({ role: 'assistant', text: answer.body });
+  }
+
+  function renderSuggestions() {
+    document.getElementById('suggestions').innerHTML = AI.SUGGESTIONS.map(function (s) {
+      return '<button type="button">' + UI.esc(s) + '</button>';
+    }).join('');
+  }
+
+  document.getElementById('suggestions').addEventListener('click', function (e) {
+    var btn = e.target.closest('button');
+    if (!btn) return;
+    document.getElementById('question').value = btn.textContent;
+    document.getElementById('chat-form').requestSubmit();
+  });
+
+  document.getElementById('chat-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var field = document.getElementById('question');
+    var q = field.value.trim();
+    if (!q || !current) return;
+
+    pushUser(q);
+    field.value = '';
+
+    var btn = document.getElementById('ask-btn');
+    btn.disabled = true; btn.textContent = 'Thinking…';
+
+    AI.ask(q, { params: current.params, result: current, profile: profile, report: report }, history)
+      .then(pushAI)
+      .catch(function (err) {
+        pushAI({ title: 'I could not answer that', body: err.message, points: [] });
+      })
+      .then(function () {
+        btn.disabled = false; btn.textContent = 'Ask';
+        field.focus();
+      });
+  });
+
+  /* ----------------------------------------------------- Claude key ----- */
+
+  function updateEngineBadge() {
+    var badge = document.getElementById('ai-engine');
+    if (AI.claudeAvailable()) {
+      badge.textContent = 'Built-in analyst + Claude';
+      badge.className = 'badge badge-ok';
+    } else {
+      badge.textContent = 'Built-in analyst';
+      badge.className = 'badge badge-info';
+    }
+  }
+
+  document.getElementById('claude-key').value = AI.getClaudeKey() ? '' : '';
+  if (AI.getClaudeKey()) document.getElementById('claude-key').placeholder = 'A key is saved on this device';
+
+  document.getElementById('save-key').addEventListener('click', function () {
+    var key = document.getElementById('claude-key').value.trim();
+    if (!key) { UI.toast('Paste a key first.', 'warn'); return; }
+    AI.setClaudeKey(key);
+    document.getElementById('claude-key').value = '';
+    document.getElementById('claude-key').placeholder = 'A key is saved on this device';
+    updateEngineBadge();
+    UI.toast('Claude connected for this browser.', 'ok');
+  });
+
+  document.getElementById('clear-key').addEventListener('click', function () {
+    AI.setClaudeKey('');
+    document.getElementById('claude-key').placeholder = 'sk-ant-…';
+    updateEngineBadge();
+    UI.toast('Key removed from this browser.', 'ok');
+  });
+
+  /* --------------------------------------------------------- report ----- */
+
+  document.getElementById('download-report').addEventListener('click', function () {
+    var lines = [];
+    lines.push('SONUBRACE ANALYSIS');
+    lines.push('Recording: ' + current.name);
+    lines.push('Generated: ' + new Date().toLocaleString());
+    lines.push('Source: ' + (current.source === 'device' ? 'Sonubrace band' : 'simulator'));
+    lines.push('');
+    lines.push('SUMMARY');
+    lines.push(report.summary);
+    lines.push('');
+    lines.push('MAIN PARAMETERS');
+    var p = current.params;
+    lines.push('  1. Velocity   PSV ' + UI.fmt(p.psv, 2) + ' m/s, EDV ' + UI.fmt(p.edv, 2) +
+               ' m/s, mean ' + UI.fmt(p.vMean, 2) + ' m/s');
+    lines.push('  2. Direction  ' + p.directionName +
+               ' (forward ' + Math.round(p.forwardFraction * 100) + '%)');
+    lines.push('  3. Pattern    ' + p.patternName + ' (periodicity ' + UI.fmt(p.periodicity, 2) +
+               ', bandwidth ' + Math.round(p.bandwidthHz) + ' Hz)');
+    lines.push('');
+    lines.push('SUPPORTING INDICES');
+    lines.push('  RI ' + UI.fmt(p.ri, 2) + '   PI ' + UI.fmt(p.pi, 2) +
+               '   S/D ' + UI.fmt(p.sdRatio, 2));
+    lines.push('  Heart rate ' + Math.round(p.heartRateBpm) + ' bpm, HRV ' +
+               Math.round(p.hrVariabilityMs) + ' ms');
+    lines.push('  Signal quality ' + Math.round(p.signalQuality * 100) + '%');
+    lines.push('');
+    lines.push('FINDINGS');
+    report.findings.forEach(function (f) {
+      lines.push('  [' + f.severity.toUpperCase() + '] ' + f.title);
+      lines.push('      ' + f.detail);
+      lines.push('      Action: ' + f.action);
+    });
+    lines.push('');
+    lines.push('REVIEW PRIORITY: ' + report.risk.score + '/100 (' + report.risk.level + ')');
+    report.risk.flags.forEach(function (f) {
+      lines.push('  +' + f.points + '  ' + f.reason + ' [' + f.domain + ']');
+    });
+    lines.push('');
+    lines.push('RISK MANAGEMENT');
+    report.management.forEach(function (m) { lines.push('  - ' + m.text); });
+    lines.push('');
+    lines.push('SPECTROGRAM EXPLANATION');
+    report.spectrogramExplanation.forEach(function (s) {
+      lines.push('  ' + s.heading);
+      lines.push('    ' + s.text);
+    });
+    lines.push('');
+    lines.push(report.disclaimer);
+
+    var safe = String(current.name).replace(/[^a-z0-9\-_ ]/gi, '').trim().replace(/\s+/g, '-') || 'recording';
+    UI.download('sonubrace-analysis-' + safe + '.txt', lines.join('\n'), 'text/plain');
+  });
+
+  var rt;
+  window.addEventListener('resize', function () {
+    clearTimeout(rt);
+    rt = setTimeout(function () {
+      if (current && current.envelope.nFrames > 1) {
+        VIZ.drawEnvelope(document.getElementById('envelope'), current, { height: 220 });
+        VIZ.drawAutocorrelation(document.getElementById('autocorr'), current, { height: 180 });
+      }
+    }, 200);
+  });
+})();
+</script>
+</body>
+</html>

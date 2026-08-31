@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create your Sonubrace account</title>
+<meta name="description" content="Create a Sonubrace account to record, save and track your Doppler haemodynamic sessions over time.">
+<link rel="canonical" href="https://YOUR-USERNAME.github.io/sonubrace/register.html">
+<meta name="robots" content="noindex, follow">
+<meta name="theme-color" content="#06657f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2306657f'/%3E%3Cpath d='M6 20c3-8 5 6 8-2s5 6 8-4' stroke='%23fff' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/sonubrace.css">
+<script>try{var t=localStorage.getItem('sonubrace.theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+</head>
+
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="site-header" data-sonubrace-header></header>
+
+<main id="main">
+  <div class="wrap-narrow stack">
+
+    <h1>Create your account</h1>
+    <p class="muted">Step 1 of 2. Next you will answer a short health questionnaire — that is what
+    lets the analysis interpret your readings against your own circumstances rather than a generic
+    average.</p>
+
+    <div class="card">
+      <form id="register-form" novalidate>
+        <div data-error-summary hidden></div>
+
+        <div class="field">
+          <label for="name">Full name</label>
+          <span class="hint" id="name-hint">Used to address you on the platform. Optional.</span>
+          <input type="text" id="name" name="name" autocomplete="name" aria-describedby="name-hint">
+        </div>
+
+        <div class="field">
+          <label for="email">Email address <span aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+          <input type="email" id="email" name="email" autocomplete="email" required>
+        </div>
+
+        <div class="field">
+          <label for="password">Password <span aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+          <span class="hint" id="password-hint">
+            At least 10 characters, including an uppercase letter, a lowercase letter and a number.
+          </span>
+          <input type="password" id="password" name="password" autocomplete="new-password"
+                 required aria-describedby="password-hint">
+          <p class="small mt-0" id="password-strength" aria-live="polite"></p>
+        </div>
+
+        <div class="field">
+          <label for="confirm">Confirm password <span aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+          <input type="password" id="confirm" name="confirm" autocomplete="new-password" required>
+        </div>
+
+        <fieldset>
+          <legend>Consent</legend>
+          <label class="check">
+            <input type="checkbox" id="consent" name="consent" required>
+            <span>I understand that Sonubrace is a research and screening aid, that it does not
+            diagnose any condition, and that it does not replace advice from a clinician.</span>
+          </label>
+        </fieldset>
+
+        <button type="submit" class="btn btn-lg btn-block" id="submit">Create account</button>
+      </form>
+    </div>
+
+    <p class="center">Already have an account? <a href="login.html">Sign in</a></p>
+
+    <div class="alert" id="storage-mode">
+      <div>
+        <h3>Where your data will live</h3>
+        <p class="mb-0" id="storage-mode-text">Checking…</p>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer class="site-footer" data-sonubrace-footer></footer>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/db.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>
+(function () {
+  'use strict';
+  var UI = SonubraceUI, DB = SonubraceDB;
+
+  UI.boot().then(function (user) {
+    if (user) location.replace('profile.html');
+  });
+
+  /* Tell the user plainly which backend is active before they hand over a
+     password — the security properties of the two are genuinely different. */
+  var modeText = document.getElementById('storage-mode-text');
+  if (DB.isRemote()) {
+    modeText.textContent = 'Your account and recordings will be stored in the project\'s hosted ' +
+      'database, protected so that only you can read your own rows. You can sign in from any device.';
+  } else {
+    document.getElementById('storage-mode').className = 'alert alert-warn';
+    modeText.textContent = 'No hosted backend is configured, so your account and recordings will be ' +
+      'kept in this browser only. Your password is hashed before it is stored and never leaves this ' +
+      'device — but the account will not exist on your other devices, and clearing site data will ' +
+      'erase it. Export your recordings regularly.';
+  }
+
+  /* Live password feedback, announced politely rather than on every keystroke. */
+  var pw = document.getElementById('password');
+  var strength = document.getElementById('password-strength');
+  pw.addEventListener('input', function () {
+    var problem = DB.passwordProblem(pw.value);
+    if (!pw.value) { strength.textContent = ''; return; }
+    strength.textContent = problem ? 'Not yet: ' + problem : 'Password meets the requirements.';
+    strength.style.color = problem ? 'var(--warn)' : 'var(--ok)';
+  });
+
+  var form = document.getElementById('register-form');
+  var submit = document.getElementById('submit');
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    UI.clearFieldErrors(form);
+
+    var name = document.getElementById('name').value.trim();
+    var email = document.getElementById('email').value.trim();
+    var password = pw.value;
+    var confirm = document.getElementById('confirm').value;
+    var consent = document.getElementById('consent').checked;
+
+    var errors = [];
+    if (!DB.validEmail(email)) {
+      errors.push({ id: 'email', message: 'Enter a valid email address.' });
+      UI.setFieldError(document.getElementById('email'), 'Enter a valid email address.');
+    }
+    var problem = DB.passwordProblem(password);
+    if (problem) {
+      errors.push({ id: 'password', message: problem });
+      UI.setFieldError(pw, problem);
+    }
+    if (password !== confirm) {
+      errors.push({ id: 'confirm', message: 'The two passwords do not match.' });
+      UI.setFieldError(document.getElementById('confirm'), 'The two passwords do not match.');
+    }
+    if (!consent) {
+      errors.push({ id: 'consent', message: 'Please confirm you understand what Sonubrace is.' });
+    }
+    if (errors.length) { UI.showFormErrors(form, errors); return; }
+
+    submit.disabled = true;
+    submit.textContent = 'Creating account…';
+
+    DB.signUp(email, password, name)
+      .then(function (res) {
+        if (res.needsConfirmation) {
+          UI.toast('Check your email to confirm the account, then sign in.', 'ok', 9000);
+          setTimeout(function () { location.href = 'login.html'; }, 2500);
+        } else {
+          UI.toast('Account created. Now tell us a little about your health.', 'ok');
+          setTimeout(function () { location.href = 'profile.html'; }, 700);
+        }
+      })
+      .catch(function (err) {
+        UI.showFormErrors(form, [{ id: 'email', message: err.message }]);
+        submit.disabled = false;
+        submit.textContent = 'Create account';
+      });
+  });
+})();
+</script>
+</body>
+</html>

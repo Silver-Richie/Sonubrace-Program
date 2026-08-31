@@ -1,0 +1,19 @@
+# Build output
+firmware/sonubrace_demo
+firmware/sonubrace_demo.exe
+firmware/*.o
+assets/js/sonubrace_dsp.js
+assets/js/sonubrace_dsp.wasm
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Never commit real credentials. If you put live Supabase keys in config.js,
+# copy it to config.local.js and ignore that instead — the anon key is designed
+# to be public, but a service-role key must never reach the repository.
+assets/js/config.local.js
+*.env

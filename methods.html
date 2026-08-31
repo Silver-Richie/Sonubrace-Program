@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Methods — How Sonubrace Measures Blood Flow with Doppler Ultrasound</title>
+<meta name="description" content="The full Sonubrace method: truncated long code excitation, quadrature demodulation, matched-filter decoding, short-time Fourier transform, Doppler spectrogram, and the equations behind velocity, flow direction, flow pattern, RI and PI.">
+<meta name="keywords" content="Doppler equation, truncated long code, coded excitation, quadrature demodulation, short-time Fourier transform, Doppler spectrogram, resistive index, pulsatility index, autocorrelation periodicity, spectral bandwidth">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://YOUR-USERNAME.github.io/sonubrace/methods.html">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="How Sonubrace Measures Blood Flow with Doppler Ultrasound">
+<meta property="og:description" content="Truncated long code excitation, quadrature demodulation, STFT and the equations behind velocity, flow direction and flow pattern.">
+<meta property="og:url" content="https://YOUR-USERNAME.github.io/sonubrace/methods.html">
+
+<meta name="theme-color" content="#06657f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2306657f'/%3E%3Cpath d='M6 20c3-8 5 6 8-2s5 6 8-4' stroke='%23fff' stroke-width='2.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/css/sonubrace.css">
+<script>try{var t=localStorage.getItem('sonubrace.theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "How Sonubrace Measures Blood Flow with Doppler Ultrasound",
+  "description": "The signal chain and equations behind the Sonubrace haemodynamic monitor: truncated long code excitation, quadrature demodulation, matched-filter decoding, short-time Fourier transform and parameter extraction.",
+  "articleSection": "Biomedical signal processing",
+  "url": "https://YOUR-USERNAME.github.io/sonubrace/methods.html",
+  "about": [
+    { "@type": "Thing", "name": "Doppler ultrasound" },
+    { "@type": "Thing", "name": "Coded excitation" },
+    { "@type": "Thing", "name": "Haemodynamic monitoring" }
+  ],
+  "citation": "Qin et al. (2012), truncated long code for dynamic signal detection in ultrasound."
+}
+</script>
+</head>
+
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="site-header" data-sonubrace-header></header>
+
+<main id="main">
+  <div class="wrap stack">
+
+    <article>
+      <p class="eyebrow">Methods</p>
+      <h1>How Sonubrace measures blood flow</h1>
+      <p style="font-size:1.12rem">
+        This page documents the whole signal chain, from the ultrasound pulse leaving the transducer
+        to the three parameters on your screen. Every equation here is implemented twice in this
+        repository: in C, in <code>firmware/sonubrace_dsp.c</code>, which is what the microcontroller
+        runs; and in JavaScript, in <code>assets/js/dsp.js</code>, which is what this website runs.
+        The two are kept deliberately identical so a result computed in the browser matches one
+        computed on the device.
+      </p>
+
+      <nav aria-label="On this page" class="card">
+        <h2 style="font-size:1.05rem">On this page</h2>
+        <ol>
+          <li><a href="#why">Why Doppler, and why continuously</a></li>
+          <li><a href="#phase0">Phase 0 — transmit</a></li>
+          <li><a href="#tlc">Truncated long code</a></li>
+          <li><a href="#phase1">Phase 1 — receive</a></li>
+          <li><a href="#stft">From Doppler signal to spectrogram</a></li>
+          <li><a href="#velocity">Parameter 1 — velocity</a></li>
+          <li><a href="#direction">Parameter 2 — flow direction</a></li>
+          <li><a href="#pattern">Parameter 3 — flow pattern</a></li>
+          <li><a href="#support">Supporting indices</a></li>
+          <li><a href="#ml">The machine-learning layer</a></li>
+          <li><a href="#limits">Limitations</a></li>
+        </ol>
+      </nav>
+
+      <!-- ================================================== why ========== -->
+      <section aria-labelledby="why">
+        <h2 id="why">Why Doppler, and why continuously</h2>
+        <p>
+          Blood flow changes constantly — with posture, with stress, with the time of day, and over
+          years with lifestyle and disease. Most non-communicable diseases touch haemodynamics
+          somewhere: heart disease acts through the vessels directly, and diabetes acts through blood
+          viscosity, among other routes. A single clinic measurement catches one moment of that.
+        </p>
+        <p>
+          Doppler ultrasound is well suited to filling the gap because it is non-invasive, needs no
+          consumables, and returns a velocity rather than a proxy. Sonubrace packages it into a
+          wrist-worn band so the measurement can be repeated as often as the user likes, and streams
+          the result to this platform over Bluetooth Low Energy so the trend is visible rather than
+          locked in a device.
+        </p>
+      </section>
+
+      <!-- ================================================ phase 0 ======== -->
+      <section aria-labelledby="phase0">
+        <h2 id="phase0">Phase 0 — transmit</h2>
+        <p>
+          A microcontroller drives the chain, clocked by a crystal oscillator that fixes the sensor
+          timing. Everything downstream depends on that clock being stable: the Doppler shift is a
+          frequency difference, so clock drift would read as blood movement.
+        </p>
+        <ol class="steps">
+          <li>The controller emits an ultrasound pulse.</li>
+          <li>The pulse is multiplied by one segment of the truncated long code, producing a coded
+              waveform.</li>
+          <li>The coded waveform is multiplied by the carrier signal.</li>
+          <li>The DAC converts the result to analogue and hands it to the transmit/receive switch,
+              which passes it to the transducer.</li>
+        </ol>
+        <p>
+          At the transducer the signal undergoes the first of two energy conversions: electrical
+          signal becomes ultrasound. The echo coming back performs the second, ultrasound becomes
+          electrical — and it is that echo which carries the Doppler shift.
+        </p>
+
+        <div class="card card-accent">
+          <h3>The Doppler relation</h3>
+          <p class="mono" style="font-size:1.15rem">f<sub>D</sub> = 2 · f₀ · v · cos θ / c</p>
+          <ul>
+            <li><strong>f<sub>D</sub></strong> — Doppler frequency shift, in hertz</li>
+            <li><strong>f₀</strong> — transmitted ultrasound frequency</li>
+            <li><strong>v</strong> — blood velocity</li>
+            <li><strong>θ</strong> — the angle between the beam and the vessel</li>
+            <li><strong>c</strong> — speed of sound in tissue, taken as 1540 m/s</li>
+          </ul>
+          <p class="mb-0">
+            The factor of 2 is there because the sound makes a round trip: it is Doppler-shifted on
+            the way in and again on the way out.
+          </p>
+        </div>
+      </section>
+
+      <!-- ==================================================== TLC ======== -->
+      <section aria-labelledby="tlc">
+        <h2 id="tlc">Truncated long code</h2>
+        <p>
+          There is a genuine tension in pulsed ultrasound. A short pulse gives good resolution but
+          carries little energy, so its echo is weak and noisy. A long pulse carries more energy but
+          smears out in time, destroying resolution.
+        </p>
+        <p>
+          Coded excitation resolves it. Transmit a long waveform modulated by a known code, then on
+          receive correlate the echo against that same code. The correlation compresses the long echo
+          back into a sharp peak, and the compression gain is roughly the code length — so you get
+          the energy of the long pulse with the resolution of the short one.
+        </p>
+        <p>
+          Sonubrace takes a further step, following Qin et al. (2012): rather than reusing one code,
+          it generates a single long sequence and <em>truncates</em> it into segments, using a
+          different segment for each transmit burst. Because segments of a maximal-length sequence
+          correlate poorly with one another, the receiver can tell which burst any given echo belongs
+          to. That is what allows bursts to overlap in flight without confusing each other, and it is
+          why the Doppler signal can stay continuous rather than being sampled in isolated snapshots.
+        </p>
+
+        <div class="card">
+          <h3>Implementation</h3>
+          <p>
+            The code is generated by a 16-bit linear-feedback shift register with taps at
+            x¹⁶ + x¹⁴ + x¹³ + x¹¹ + 1, giving a maximal-length sequence of 65 535 chips. The default
+            configuration takes 16 segments of 32 chips. The quality of a segment is measured by its
+            peak-to-sidelobe ratio — how far the true correlation peak stands above the code's own
+            self-noise — reported by <code>sb_code_psl_db()</code>.
+          </p>
+        </div>
+      </section>
+
+      <!-- ================================================ phase 1 ======== -->
+      <section aria-labelledby="phase1">
+        <h2 id="phase1">Phase 1 — receive</h2>
+        <ol class="steps">
+          <li><strong>Amplifier.</strong> The returning echo is tiny and is amplified first.</li>
+          <li><strong>Time-gain compensation.</strong> Echoes from deeper tissue have travelled
+              further and are more attenuated. TGC applies a depth-dependent gain so a deep vessel is
+              not systematically quieter than a shallow one.</li>
+          <li><strong>Band-pass filter.</strong> Keeps the band around the carrier and discards the
+              rest.</li>
+          <li><strong>ADC.</strong> The echo becomes a digital signal.</li>
+          <li><strong>Quadrature demodulation.</strong> The digitised echo is split to two mixers: one
+              driven by a carrier at phase 0, giving the in-phase channel I; the other at phase π/2,
+              giving the quadrature channel Q.</li>
+          <li><strong>Decoding.</strong> Each channel is matched-filtered against the code segment
+              that was transmitted, restoring resolution and gaining signal-to-noise.</li>
+          <li><strong>Recombination.</strong> The decoded data from the separate truncated segments
+              are combined, and the Doppler signal is ready.</li>
+        </ol>
+
+        <div class="card card-accent">
+          <h3>Why two channels rather than one</h3>
+          <p class="mb-0">
+            A single mixer produces a signal proportional to |f<sub>D</sub>| — the magnitude of the
+            shift, with the sign thrown away. That would leave forward and reverse flow
+            indistinguishable, and the methods this platform implements are explicit that using an
+            absolute value is not acceptable. Because I and Q are a quarter cycle apart, the pair
+            forms a complex signal I + jQ whose spectrum is asymmetric about zero: positive
+            frequencies mean flow toward the transducer and negative frequencies mean flow away.
+            Direction survives, and it survives for free.
+          </p>
+        </div>
+
+        <p class="mt-2">
+          One more stage runs before analysis: a <strong>wall filter</strong>, a high-pass on the slow-time
+          signal. Vessel walls and the probe itself move slowly and reflect strongly, producing a
+          large near-DC clutter component that would otherwise dominate the spectrum. The default
+          cut-off is 60 Hz.
+        </p>
+      </section>
+
+      <!-- =================================================== STFT ======== -->
+      <section aria-labelledby="stft">
+        <h2 id="stft">From Doppler signal to spectrogram</h2>
+        <p>
+          The Doppler signal is a time series whose frequency content changes moment to moment — that
+          changing content <em>is</em> the heartbeat. A single Fourier transform over the whole
+          recording would average all of that away, so Sonubrace uses a short-time Fourier transform:
+          slide a window along the signal, transform each windowed slice, and stack the results.
+        </p>
+        <p class="mono" style="font-size:1.05rem">
+          Doppler signal → STFT → P(f, t) → Doppler equation → Doppler spectrogram
+        </p>
+        <p>
+          P(f, t) is the power present at frequency f at time t. Displayed with time on the horizontal
+          axis, signed Doppler frequency on the vertical and power as brightness, it is the Doppler
+          spectrogram. The default window is 256 samples of Hann with a hop of 64, giving roughly
+          62.5 Hz of frequency resolution and 4 ms between columns at the default 16 kHz slow-time rate.
+        </p>
+        <div class="alert">
+          <div>
+            <h3>The resolution trade-off</h3>
+            <p class="mb-0">
+              A longer window resolves frequency more finely but blurs time, so a sharp systolic
+              upstroke smears. A shorter window sharpens time but coarsens the velocity axis. This is
+              not a tuning oversight; it is the uncertainty principle, and 256 samples is the
+              compromise chosen for cardiac timescales.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- =============================================== velocity ======== -->
+      <section aria-labelledby="velocity">
+        <h2 id="velocity">Parameter 1 — velocity</h2>
+        <p>
+          At each moment, the strongest frequency present is the one belonging to the fastest blood in
+          the sample volume. Finding it is an argmax over the spectrogram column:
+        </p>
+        <p class="mono" style="font-size:1.1rem">f<sub>D</sub>(t) = argmax<sub>f</sub> P(f, t)</p>
+        <p>
+          Sonubrace refines that with parabolic interpolation across the peak and its two neighbours,
+          which recovers sub-bin precision and turns a stepped envelope into a smooth one. The
+          Doppler relation is then inverted to give velocity:
+        </p>
+        <p class="mono" style="font-size:1.1rem">v(t) = c · f<sub>D</sub>(t) / (2 · f₀ · cos θ)</p>
+        <p>
+          Tracing v(t) across the whole recording gives the <strong>velocity envelope</strong>. From it:
+          the <strong>peak systolic velocity (PSV)</strong> is the height of each systolic peak, the
+          <strong>end-diastolic velocity (EDV)</strong> is the value just before the next cycle begins,
+          and the <strong>mean velocity</strong> is the time average.
+        </p>
+        <p>
+          Velocity is the parameter most directly tied to symptoms. Flow that is too fast is
+          associated with hypertension; flow that is too slow can accompany hypotension and is one of
+          the indications discussed alongside hyperglycaemia.
+        </p>
+
+        <div class="alert alert-warn">
+          <div>
+            <h3>cos θ dominates everything</h3>
+            <p class="mb-0">
+              Every velocity on this platform is divided by cos θ. At θ = 60° an error of 5° changes
+              the result by about 15%. At θ = 80° the same 5° error changes it by more than 50%, and
+              at 90° the cosine is zero and no velocity can be measured at all. This is precisely why
+              the IMU exists, and why the angle guide is not a nicety.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== direction ======== -->
+      <section aria-labelledby="direction">
+        <h2 id="direction">Parameter 2 — flow direction</h2>
+        <p>Direction follows from the sign of the Doppler shift:</p>
+        <ul>
+          <li><strong>f<sub>D</sub> &gt; 0</strong> — flow toward the transducer (forward, antegrade)</li>
+          <li><strong>f<sub>D</sub> &lt; 0</strong> — flow away from the transducer (reverse, retrograde)</li>
+        </ul>
+        <p>
+          There is a real difficulty here worth naming: systolic and diastolic flow can produce
+          numerically similar shifts with opposite signs. Taking an absolute value would collapse
+          them together and lose the distinction entirely. The truncated-long-code receiver avoids
+          this because the in-phase and quadrature channels already encode the sign — the complex
+          spectrum is simply asymmetric, and the two cases land on opposite sides of the baseline.
+        </p>
+        <p>
+          Sonubrace reports the direction as the power-weighted balance between the two sides. It also
+          flags brief early-diastolic reversal separately, because in a limb artery that reversal is
+          normal — it is the pulse wave reflecting from the periphery — and its <em>absence</em> is
+          the more interesting finding.
+        </p>
+      </section>
+
+      <!-- ================================================ pattern ======== -->
+      <section aria-labelledby="pattern">
+        <h2 id="pattern">Parameter 3 — flow pattern</h2>
+        <p>Pattern is built from three measurements, none of which suffices alone.</p>
+
+        <h3>Periodicity — does the waveform repeat?</h3>
+        <p class="mono" style="font-size:1.05rem">R<sub>xx</sub>(τ) = Σ<sub>t</sub> x(t) · x(t + τ)</p>
+        <p>
+          Autocorrelation compares the signal with a delayed copy of itself. If the flow is regular,
+          some lag τ makes them line up almost perfectly and R<sub>xx</sub> peaks sharply there — that
+          lag is the cardiac cycle length, and the peak height is the periodicity score. Sonubrace
+          normalises it to 0–1 and treats anything below 0.35 as irregular.
+        </p>
+
+        <h3>Spectral bandwidth — how spread out are the velocities?</h3>
+        <p class="mono" style="font-size:1.05rem">BW = f<sub>high</sub>(t) − f<sub>low</sub>(t)</p>
+        <p>
+          At a single instant, how wide is the band of frequencies present? A narrow spectrum means
+          the blood cells are moving together at a concentrated velocity. A wide one means many
+          different speeds coexist. This is the measurement that identifies anomalies: disturbed flow
+          past a narrowing spreads velocities out, and on the spectrogram that shows up as the dark
+          window beneath the envelope filling in.
+        </p>
+
+        <h3>Waveform morphology — what shape is the beat?</h3>
+        <p>
+          Shape is captured through PSV, EDV and mean velocity, which combine into RI and PI below,
+          together with the acceleration time from cycle onset to systolic peak and the consistency
+          of that shape across successive beats.
+        </p>
+
+        <div class="table-scroll mt-2">
+          <table>
+            <caption>How the three measurements combine into a pattern class</caption>
+            <thead>
+              <tr><th scope="col">Pattern</th><th scope="col">Signature</th><th scope="col">What it suggests</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Laminar</th>
+                  <td>High periodicity, narrow spectrum</td>
+                  <td>Blood moving together — the expected healthy picture</td></tr>
+              <tr><th scope="row">Pulsatile</th>
+                  <td>PI &gt; 4.0 or RI &gt; 0.92</td>
+                  <td>Strong systolic surge, little diastolic flow; stiffer vessels or high downstream resistance</td></tr>
+              <tr><th scope="row">Turbulent</th>
+                  <td>Spectral broadening &gt; 0.55</td>
+                  <td>Velocities spread widely; disturbed flow, classically past a narrowing</td></tr>
+              <tr><th scope="row">Irregular</th>
+                  <td>Periodicity &lt; 0.35, or beat variation &gt; 120 ms</td>
+                  <td>Beats not repeating at a steady interval — a matter for a clinician with an ECG</td></tr>
+              <tr><th scope="row">Damped</th>
+                  <td>Acceleration time &gt; 120 ms with RI &lt; 0.70</td>
+                  <td>Slow, blunted upstroke; the downstream signature of a proximal obstruction</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ================================================ support ======== -->
+      <section aria-labelledby="support">
+        <h2 id="support">Supporting indices</h2>
+        <p>
+          These are computed from the three main parameters, not measured independently. They exist
+          because they are the numbers clinical literature is written in.
+        </p>
+
+        <div class="grid grid-2">
+          <div class="card">
+            <h3>Resistive index</h3>
+            <p class="mono" style="font-size:1.1rem">RI = (PSV − EDV) / PSV</p>
+            <p class="mb-0">
+              How much of the flow disappears between beats. RI near 1 means flow almost stops in
+              diastole, indicating high resistance in the vascular bed downstream.
+            </p>
+          </div>
+          <div class="card">
+            <h3>Pulsatility index</h3>
+            <p class="mono" style="font-size:1.1rem">PI = (PSV − EDV) / mean velocity</p>
+            <p class="mb-0">
+              Assesses the elasticity of the vessel and the variability of flow across the cycle.
+              Because it divides by the mean rather than the peak, it stays informative even when
+              diastolic flow reverses and RI saturates.
+            </p>
+          </div>
+        </div>
+
+        <p class="mt-2">
+          Alongside these the platform reports the S/D ratio (PSV / EDV), the acceleration time, the
+          heart rate and its beat-to-beat variability, all derived from the same cardiac-cycle
+          segmentation.
+        </p>
+      </section>
+
+      <!-- ===================================================== ML ======== -->
+      <section aria-labelledby="ml">
+        <h2 id="ml">The machine-learning layer</h2>
+        <p>
+          Haemodynamic status changes continuously, and it has to be assessed in a form every user can
+          act on. The interpretation layer takes the whole chain as input — the transmitted frequency,
+          the modulated frequency, the Doppler shift, the truncated-long-code processing, the Doppler
+          signal, the STFT output, the spectrogram, and the three parameters — together with the
+          user's health profile.
+        </p>
+        <p>
+          The shipped analyst is a <strong>deterministic feature-based model</strong>: a transparent,
+          additive scoring function over those features. That is a design choice, not a placeholder.
+          A screening tool that people are meant to trust should give the same reading for the same
+          recording every time, and should be able to show exactly which factor contributed what — as
+          the analysis page does, line by line. A black box producing an unexplainable number would be
+          worse than no number.
+        </p>
+        <p>
+          The output has two halves, matching the flowchart's terminal nodes: a
+          <strong>spectrogram explanation</strong> that makes the picture readable to a general
+          audience, and <strong>risk management</strong> that names general, non-prescriptive steps to
+          raise with a clinician. Where a supervised model is later trained on a labelled cohort, it
+          slots in behind the same interface — the feature vector it would consume is already assembled
+          by <code>SonubraceAI.contextBrief()</code>.
+        </p>
+      </section>
+
+      <!-- ================================================ limits ========= -->
+      <section aria-labelledby="limits">
+        <h2 id="limits">Limitations</h2>
+        <p>Stated plainly, because a screening tool that overstates itself does harm.</p>
+        <ul>
+          <li><strong>Angle dependence.</strong> Every velocity is scaled by 1/cos θ. An unmeasured or
+              misjudged angle is the largest single source of error in the whole system.</li>
+          <li><strong>Site dependence.</strong> The reference ranges built into the analyst are for a
+              peripheral wrist artery. Applying them to a carotid recording would misread it.</li>
+          <li><strong>Single sample volume.</strong> The band measures where it sits. A normal reading
+              says nothing about a vessel elsewhere.</li>
+          <li><strong>Aliasing.</strong> Doppler shifts beyond half the pulse repetition frequency
+              wrap around. Very high velocities can therefore be under-read.</li>
+          <li><strong>Not validated against a clinical reference.</strong> The reference ranges and
+              classification thresholds here are defaults drawn from the general literature. They
+              have not been calibrated against duplex ultrasound in a clinical cohort, and should be
+              before any claim is made about diagnostic performance.</li>
+          <li><strong>Not a diagnostic device.</strong> Sonubrace measures haemodynamics and flags
+              patterns. It does not diagnose, and it does not replace clinical assessment.</li>
+        </ul>
+      </section>
+
+      <section class="card card-accent mt-3">
+        <h2>Where the code lives</h2>
+        <div class="table-scroll">
+          <table>
+            <caption>Each stage of the chain and the function that implements it</caption>
+            <thead>
+              <tr><th scope="col">Stage</th><th scope="col">C (firmware)</th><th scope="col">JavaScript (web)</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Code generation</th><td class="mono">sb_generate_truncated_long_code</td><td class="mono">generateTruncatedLongCode</td></tr>
+              <tr><th scope="row">Coded burst</th><td class="mono">sb_build_coded_burst</td><td class="mono">buildCodedBurst</td></tr>
+              <tr><th scope="row">TGC</th><td class="mono">sb_apply_tgc</td><td class="mono">—</td></tr>
+              <tr><th scope="row">I/Q demodulation</th><td class="mono">sb_quadrature_demodulate</td><td class="mono">quadratureDemodulate</td></tr>
+              <tr><th scope="row">Decoding</th><td class="mono">sb_decode_segment</td><td class="mono">decodeSegment</td></tr>
+              <tr><th scope="row">Wall filter</th><td class="mono">sb_wall_filter</td><td class="mono">wallFilter</td></tr>
+              <tr><th scope="row">STFT</th><td class="mono">sb_stft</td><td class="mono">stft</td></tr>
+              <tr><th scope="row">Envelope</th><td class="mono">sb_extract_envelope</td><td class="mono">extractEnvelope</td></tr>
+              <tr><th scope="row">Cycle segmentation</th><td class="mono">sb_segment_cardiac_cycles</td><td class="mono">segmentCardiacCycles</td></tr>
+              <tr><th scope="row">Parameters</th><td class="mono">sb_compute_params</td><td class="mono">computeParams</td></tr>
+              <tr><th scope="row">Periodicity</th><td class="mono">sb_periodicity</td><td class="mono">periodicity</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <p class="small muted mt-2">
+        Reference: Qin, et al. (2012), on truncated long code for detecting dynamic signals such as
+        Doppler and shear wave in the ultrasound field.
+      </p>
+    </article>
+
+  </div>
+</main>
+
+<footer class="site-footer" data-sonubrace-footer></footer>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/db.js"></script>
+<script src="assets/js/ui.js"></script>
+<script>SonubraceUI.boot();</script>
+</body>
+</html>
